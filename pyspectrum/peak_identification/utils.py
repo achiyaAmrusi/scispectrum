@@ -5,8 +5,8 @@ def gaussian(x, amplitude, mean, fwhm):
     """
     Gaussian function.
 
-        Parameters
-        ----------
+    Parameters
+    ----------
     x: array-like
         Input values.
     amplitude: float

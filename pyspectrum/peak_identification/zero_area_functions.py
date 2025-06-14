@@ -24,6 +24,7 @@ def gaussian_2_dev(x, mean, fwhm):
     return ((std**2-(x-mean)**2) / std**4) * 1/((2*np.pi)**0.5 * std) * np.exp(-(1/2)*((x-mean) / std)**2)
 
 
+
 def asymmetrical_rect_zero_area(x, mean, width):
     """
     non-symmetrical zero area function for non-symmetrical peak recognition

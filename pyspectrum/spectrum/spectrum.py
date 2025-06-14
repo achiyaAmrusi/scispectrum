@@ -79,6 +79,7 @@ class Spectrum:
         self.fwhm_calibration = fwhm_calibration
         self._convolution = None
         self._find_peak_domain = None
+        self._xr_spectrum = xr.DataArray(counts, coords={'energy': self.energy_calibration(self.channels)}, dims=['energy'])
 
     def xr_spectrum(self):
         """
@@ -88,14 +89,11 @@ class Spectrum:
         -------
         xr.DataArray: Xarray representation of the spectrum.
         """
-        spectrum = xr.DataArray(self.counts, coords={'energy': self.energy_calibration(self.channels)},
-                                dims=['energy'])
-        return spectrum
+        return self._xr_spectrum
 
     def calibrate_energy(self, energy_calibration):
         """
         change the energy calibration polynom of Spectrum
-        todo: I think the method is pointless
         Parameters
         ----------
         energy_calibration: np.poly1d
@@ -104,6 +102,8 @@ class Spectrum:
         if not isinstance(energy_calibration, np.poly1d):
             raise TypeError("Variable x must be of type numpy.poly1d.")
         self.energy_calibration = energy_calibration
+        self._xr_spectrum = xr.DataArray(self._xr_spectrum.values,
+                                         coords={'energy': self.energy_calibration(self.channels)}, dims=['energy'])
 
     def calibrate_fwhm(self, fwhm_calibration):
         """
@@ -135,7 +135,7 @@ class Spectrum:
          a function that given energy/channel(first raw in file) returns the fwhm
         sep: str
          the separation letter
-        kwargs: more parameter for pd.read_csv
+        kwargs: more parameter for pd.read_csvSp
 
         Returns
         -------
@@ -231,7 +231,7 @@ class Spectrum:
             # fwhm in the peak
             middle_channel = round((peak_domain[0] + peak_domain[1]) / 2)
             ch_fwhm = self.fwhm_calibration(
-                self.energy_calibration(middle_channel)) / self.energy_calibration[1]
+                self.energy_calibration(middle_channel))  / self.energy_calibration[1]
 
             # the background levels from left and right
             if (peak_domain[0] - round(ch_fwhm / 2)) < 0:
@@ -250,7 +250,7 @@ class Spectrum:
                 peak_bg_r = ufloat(spectrum[peak_domain[1]:peak_domain[1] + round(ch_fwhm / 2)].mean(),
                                    spectrum[peak_domain[1]:peak_domain[1] + round(ch_fwhm / 2)].std())
 
-            # extract the peak slice and the backgrond height
+            # extract the peak slice and the background height
             peak = self.xr_spectrum().sel(
                 energy=slice(self.energy_calibration(peak_domain[0]),
                              self.energy_calibration(peak_domain[1])))
@@ -309,7 +309,41 @@ class Spectrum:
                                                         minimal_statistical_accuracy=minimal_statistical_accuracy,
                                                         refind_peaks_flag=refind_peaks_flag,
                                                         smoothing_factor=smoothing_factor, **kwargs)
-        self.xr_spectrum().plot()
+        self._xr_spectrum.plot()
         for i, peak in enumerate(peaks_properties):
             energy_domain = self.energy_calibration(np.arange(peaks_domain[i][0], peaks_domain[i][1], 1))
             fitting_method.plot_fit(energy_domain, peak)
+
+# make Spectrum to behave like xarray
+    def __getattr__(self, name):
+        return getattr(self._xr_spectrum, name)  # Delegate attribute access to xarray
+
+    def __getitem__(self, key):
+        return self._xr_spectrum[key]  # Allow indexing like spec[10]
+
+    def __repr__(self):
+        return repr(self._xr_spectrum)  # Show the xarray representation
+
+    def _apply_operation(self, other, op):
+        """Helper method to apply operations while preserving the Spectrum class"""
+        if isinstance(other, Spectrum):
+            other = other._xr_spectrum  # Extract xarray from Spectrum
+        return Spectrum(counts=op(self._xr_spectrum, other).values,
+                        channels=self.channels,
+                        energy_calibration_poly=self.energy_calibration,
+                        fwhm_calibration=self.fwhm_calibration)
+    # Arithmetic operations
+    def __add__(self, other):
+        return self._apply_operation(other, lambda x, y: x + y)
+
+    def __sub__(self, other):
+        return self._apply_operation(other, lambda x, y: x - y)
+
+    def __mul__(self, other):
+        return self._apply_operation(other, lambda x, y: x * y)
+
+    def __truediv__(self, other):
+        return self._apply_operation(other, lambda x, y: x / y)
+
+    def __pow__(self, other):
+        return self._apply_operation(other, lambda x, y: x ** y)

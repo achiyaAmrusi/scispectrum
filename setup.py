@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name='pySpectrum',
+    name='PySpectrum',
     version='1.0',
     packages=['pyspectrum', 'pyspectrum.peak', 'pyspectrum.spectrum', 'pyspectrum.calibration',
               'pyspectrum.peak_fitting', 'pyspectrum.detector_parser', 'pyspectrum.peak_identification'],

@@ -118,7 +118,7 @@ class GaussianWithBGFitting(PeakFit):
         initial_guess = {}
         param_names = []
         for i in range(peak_number):
-            initial_guess.update({f'amplitude_{i}': spectrum_slice.sel(channel=peaks_centers[i]).values,
+            initial_guess.update({f'amplitude_{i}': spectrum_slice.sel(channel=peaks_centers[i], method='nearest').item(),
                                   f'mean_{i}': peaks_centers[i],
                                   f'fwhm_{i}': fwhm})
             param_names.extend([f'amplitude_{i}', f'mean_{i}', f'fwhm_{i}'])
@@ -130,7 +130,7 @@ class GaussianWithBGFitting(PeakFit):
         return initial_guess, param_names
 
     @staticmethod
-    def create_bounds(spectrum_slice: xr.DataArray, number_of_peaks: np.ndarray):
+    def create_bounds(spectrum_slice: xr.DataArray, number_of_peaks: int):
         """
 ````    `creates initial guess for the fit using xarray.
         Parameters

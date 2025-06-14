@@ -64,11 +64,11 @@ class Peak:
         # initialization
         self.estimated_center, self.estimated_resolution = Peak.center_fwhm_estimator(self.peak)
 
-        if not (isinstance(ubackground_l, type(ufloat(0, 0)))):
+        if not (isinstance(ubackground_l, type(ufloat(0, 1)))):
             raise TypeError("Variable ubackground_l must be of type ufloat.")
         self.height_left = ubackground_l
 
-        if not (isinstance(ubackground_r, type(ufloat(0, 0)))):
+        if not (isinstance(ubackground_r, type(ufloat(0, 1)))):
             raise TypeError("Variable ubackground_r must be of type ufloat.")
         self.height_right = ubackground_r
 
@@ -97,7 +97,7 @@ class Peak:
         # define the full width half maximum area (meaning the area which is bounded by the fwhm edges)
         fwhm_slice = peak.sel(channel=slice(minimal_channel, maximal_channel))
         # return the mean energy in the fwhm which is the energy center
-        return (fwhm_slice * fwhm_slice.coords['channel']).sum() / fwhm_slice.sum(), (maximal_channel - minimal_channel)
+        return ((fwhm_slice * fwhm_slice.coords['channel']).sum() / fwhm_slice.sum()).item(), (maximal_channel - minimal_channel)
 
     def direct_sum_counts_under_fwhm(self, number_of_fwhm=1):
         """
@@ -219,3 +219,4 @@ class Peak:
         peak_no_bg = xr.DataArray(data=peak_no_bg, coords=self.peak.coords)
 
         return peak_no_bg
+

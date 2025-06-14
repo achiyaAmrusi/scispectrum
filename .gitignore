@@ -3,3 +3,4 @@
 .git/
 /pySpectrum.egg-info/
 .gitignore
+.venv
