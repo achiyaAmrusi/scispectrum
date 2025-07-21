@@ -2,10 +2,10 @@
 import xarray as xr
 import numpy as np
 import math
-from uncertainties import ufloat, nominal_value
+from uncertainties import ufloat, nominal_value, UFloat
 from uncertainties.unumpy import nominal_values, std_devs, uarray
 from pyspectrum.peak_fitting.std_gaussian_fitting import GaussianWithBGFitting
-
+import operator
 
 class Peak:
     """
@@ -22,7 +22,7 @@ class Peak:
      This is needed for background subtraction
     Attributes
     ----------
-    peak: xr.DataArray
+    _xr_peak: xr.DataArray
      The peak counts and energies in form of an xarray
     height_left, height_right: ufloat (default ufloat(0, 1))
      Mean counts from the left and right to the peak
@@ -60,15 +60,15 @@ class Peak:
         if not (isinstance(peak_xarray, xr.DataArray)) and len(peak_xarray.dims) == 1:
             raise TypeError("Variable peak_xarray must be of type 1d xr.DataArray.")
         # peak variable is channel
-        self.peak = peak_xarray.rename({peak_xarray.dims[0]: 'channel'})
+        self._xr_peak = peak_xarray.rename({peak_xarray.dims[0]: 'channel'})
         # initialization
-        self.estimated_center, self.estimated_resolution = Peak.center_fwhm_estimator(self.peak)
+        self.estimated_center, self.estimated_resolution = Peak.center_fwhm_estimator(self._xr_peak)
 
-        if not (isinstance(ubackground_l, type(ufloat(0, 1)))):
+        if not (isinstance(ubackground_l, UFloat)):
             raise TypeError("Variable ubackground_l must be of type ufloat.")
         self.height_left = ubackground_l
 
-        if not (isinstance(ubackground_r, type(ufloat(0, 1)))):
+        if not (isinstance(ubackground_r, UFloat)):
             raise TypeError("Variable ubackground_r must be of type ufloat.")
         self.height_right = ubackground_r
 
@@ -122,7 +122,7 @@ class Peak:
         peak_mean = nominal_value(self.first_moment_method_center())
         minimal_channel = peak_mean - number_of_fwhm * (fwhm / 2)
         maximal_channel = peak_mean + number_of_fwhm * (fwhm / 2)
-        energy = self.peak.coords['channel']
+        energy = self._xr_peak.coords['channel']
         center_index = np.where(energy > peak_mean)[0][0]
         de = energy[center_index + 1] - energy[center_index]
         fwhm_slice = (self.subtract_background()).sel(channel=slice(minimal_channel - de / 2, maximal_channel))
@@ -138,7 +138,7 @@ class Peak:
         xr.DataSet
             Gaussian plus background parameters values and uncertainties.
         """
-        fit_params = GaussianWithBGFitting.fit(self.peak, peaks_centers=[self.estimated_center],
+        fit_params = GaussianWithBGFitting.fit(self._xr_peak, peaks_centers=[self.estimated_center],
                                                estimated_fwhm=self.estimated_resolution,
                                                background_parameters=[self.height_left - self.height_right,
                                                                       self.height_right])
@@ -169,7 +169,7 @@ class Peak:
         amplitude_error = fit_parameter['curvefit_covariance'].sel(cov_i='amplitude', cov_j='amplitude')
         fwhm = fit_parameter['curvefit_coefficients'].sel(param='fwhm')
         # energy size of each bin
-        bin_size = self.peak.coords['channel'][1] - self.peak.coords['channel'][0]
+        bin_size = self._xr_peak.coords['channel'][1] - self._xr_peak.coords['channel'][0]
         # factor to get area under the fwhm
         factor_of_area = 0.76096811 * np.sqrt(2 * np.pi) * (fwhm / (2 * np.sqrt(2 * np.log(2))))
         return ufloat(factor_of_area * amplitude * (1 / bin_size), factor_of_area * amplitude_error * (1 / bin_size))
@@ -184,8 +184,8 @@ class Peak:
          peak center, uncertainty
         """
         # extract the slice of 2 fwhm width from each side of the spectrum
-        minimal_channel = max(self.estimated_center - 2*self.estimated_resolution, self.peak.coords['channel'][0])
-        maximal_channel = min(self.estimated_center + 2*self.estimated_resolution, self.peak.coords['channel'][-1])
+        minimal_channel = max(self.estimated_center - 2 * self.estimated_resolution, self._xr_peak.coords['channel'][0])
+        maximal_channel = min(self.estimated_center + 2 * self.estimated_resolution, self._xr_peak.coords['channel'][-1])
         fwhm_slice = (self.subtract_background()).sel(channel=slice(minimal_channel, maximal_channel))
 
         # calculate the mean energy in the fwhm which is the energy center
@@ -204,19 +204,85 @@ class Peak:
         """
         # background estimation
         std = (self.estimated_resolution / (2 * np.sqrt(2 * np.log(2))))
-        erf = np.array([(math.erf(-(x - self.estimated_center) / std) + 1) for x in self.peak.coords['channel'].to_numpy()])
+        erf = np.array([(math.erf(-(x - self.estimated_center) / std) + 1) for x in self._xr_peak.coords['channel'].to_numpy()])
         height_difference = self.height_left-self.height_right
         peak_baseline = min(self.height_right, self.height_left)
         approx_bg = 0.5 * height_difference * erf + peak_baseline
 
         # background subtraction
-        approx_peak = self.peak - nominal_values(approx_bg)
+        approx_peak = self._xr_peak - nominal_values(approx_bg)
         # poisson error
         approx_std_peak = abs(approx_peak)**0.5
         # into an xarray
         peak_no_bg = uarray(nominal_values=approx_peak, std_devs=np.sqrt(approx_std_peak**2+std_devs(approx_bg)))
         # fix into -
-        peak_no_bg = xr.DataArray(data=peak_no_bg, coords=self.peak.coords)
+        peak_no_bg = xr.DataArray(data=peak_no_bg, coords=self._xr_peak.coords)
 
         return peak_no_bg
+# make Peak to behave like xarray
+    def __getattr__(self, name):
+        return getattr(self._xr_peak, name)  # Delegate attribute access to xarray
 
+    def __getitem__(self, key):
+        return self._xr_peak[key]  # Allow indexing like spec[10]
+
+    def __repr__(self):
+        return repr(self._xr_peak)  # Show the xarray representation
+
+    def _apply_operation(self, other, op, op_name=None):
+        """Helper method to apply operations while preserving the Spectrum class
+        if somthing else rather than Peak is operated onto the Peak, the background dosent change"""
+
+        is_peak = isinstance(other, Peak)
+        is_scalar = isinstance(other, (int, float, UFloat))
+
+        if is_peak:
+            other_xr = other._xr_peak
+            other_height_left = other.height_left
+            other_height_right = other.height_right
+
+            new_height_left = op(self.height_left, other_height_left)
+            new_height_right = op(self.height_right, other_height_right)
+
+        elif is_scalar:
+            other_xr = other
+
+            # Scale background for multiplication and division
+            if op_name in ("mul", "div"):
+                new_height_left = op(self.height_left, other)
+                new_height_right = op(self.height_right, other)
+
+            elif op_name in ("add", "sub"):
+                # For addition/subtraction, background stays the same
+                new_height_left = self.height_left
+                new_height_right = self.height_right
+            else:
+                # power operation does not give well-defined background value
+                new_height_left = ufloat(np.nan, np.nan)
+                new_height_right = ufloat(np.nan, np.nan)
+        else:
+
+            raise TypeError(f"Unsupported operand type for Peak: {type(other)}")
+
+        return Peak(
+            peak_xarray=op(self._xr_peak, other_xr),
+            ubackground_l=new_height_left,
+            ubackground_r=new_height_right
+        )
+
+
+    # Arithmetic operations
+    def __add__(self, other):
+        return self._apply_operation(other, lambda x, y: x + y, op_name="add")
+
+    def __sub__(self, other):
+        return self._apply_operation(other, lambda x, y: x - y, op_name="sub")
+
+    def __mul__(self, other):
+        return self._apply_operation(other, lambda x, y: x * y, op_name="mul")
+
+    def __truediv__(self, other):
+        return self._apply_operation(other, lambda x, y: x / y, op_name="div")
+
+    def __pow__(self, other):
+        return self._apply_operation(other, lambda x, y: x ** y, op_name="pow")

@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='PySpectrum',
-    version='1.0',
+    version='0.1',
     packages=['pyspectrum', 'pyspectrum.peak', 'pyspectrum.spectrum', 'pyspectrum.calibration',
               'pyspectrum.peak_fitting', 'pyspectrum.detector_parser', 'pyspectrum.peak_identification'],
     url='https://github.com/achiyaAmrusi/pySpectrum',
