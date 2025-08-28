@@ -1,4 +1,15 @@
-This is a python package that represents and handles spectra
-It contains the realization of spectrum and peak in the code,
-Also, the package contains tools for peak analysis, finding peak domain or centers and also peak analysis.
+PySpectrum is a Python package for representing and analyzing spectra using the xarray framework.
 
+The package provides robust implementations of Spectrum and Peak objects, which include methods for:
+
+Peak finding and center detection
+
+Spectrum fitting and integration
+
+Domain analysis and manipulation
+
+Other common spectral analysis tasks
+
+The repository also includes example notebooks demonstrating common workflows and how to use the package effectively.
+
+PySpectrum is designed to simplify spectrum handling while providing flexibility for advanced analysis workflows.
