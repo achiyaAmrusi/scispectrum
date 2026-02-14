@@ -1,5 +1,5 @@
 import numpy as np
-
+from pyspectrum.identification.kernels.utils import fwhm_to_sigma
 
 def gaussian(x, amplitude, mean, fwhm):
     """
@@ -21,4 +21,5 @@ def gaussian(x, amplitude, mean, fwhm):
     array-like
         Gaussian values in x.
     """
-    return amplitude * np.exp(-(1/2)*((x-mean) / (fwhm/2.35482))**2)
+    sigma = fwhm_to_sigma(fwhm)
+    return amplitude * np.exp(-(1/2)*((x-mean) / sigma**2))

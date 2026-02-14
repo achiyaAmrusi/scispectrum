@@ -4,7 +4,7 @@ import numpy as np
 import math
 from uncertainties import ufloat, nominal_value, UFloat
 from uncertainties.unumpy import nominal_values, std_devs, uarray
-from pyspectrum.peak_fitting.std_gaussian_fitting import GaussianWithBGFitting
+from pyspectrum.fitting.std_gaussian_fitting import GaussianWithBGFitting
 import operator
 
 class Peak:

@@ -1,9 +1,9 @@
 import numpy as np
 import xarray as xr
 from scipy.signal import find_peaks
-from pyspectrum.peak_identification.utils import gaussian
-from pyspectrum.peak_identification.convolution import Convolution
-from pyspectrum.peak.peak import Peak
+from pyspectrum.identification.utils import gaussian
+from pyspectrum.identification.convolution import Convolution
+from pyspectrum.core.peak import Peak
 from uncertainties import ufloat
 
 
