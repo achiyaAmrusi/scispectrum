@@ -1,96 +1,160 @@
 import pandas as pd
 import numpy as np
-from pyspectrum.spectrum import Spectrum
+from pathlib import Path
+from pyspectrum.core import Spectrum
 
 
 class TimeChannelParser:
     """
-    Parser class for list mode into Spectrum.
-    The methods parse the data, filters negative counts and can process pileup or flag indicator (require alert_column == 0).
+    Convert time–channel list-mode data into a Spectrum.
+
+    The parser filters invalid events (negative channels or flagged
+    pileup/overflow) and builds a histogram of counts per channel.
+
+    Large files can be processed using chunked reading via `from_file`,
+    which avoids loading the entire dataset into memory.
 
     Methods
     -------
-    to_spectrum(time_channel_df: pd.DataFrame, energy_calibration_poly=np.poly1d([1, 0]), fwhm_calibration=None, num_of_channels=2 ** 14)
-    Filter the time_channel file from pileup and negative counts
-    then transform data to spectrum using the calibrations
-    counts_in_time_into_spectrum(cls, time_channel_df: pd.DataFrame, num_of_channels=2 ** 14)
-     Takes a data frame with time stemp, count and pileup and turn into spectrum in dataframe form
+    from_file(...)
+        Parse a list-mode file in chunks and build a Spectrum.
+
+    from_dataframe(...)
+        Convert an in-memory dataframe into a Spectrum.
+
+    filter(...)
+        Identify valid events based on channel and optional flag.
     """
     def __init__(self):
         pass
 
     @staticmethod
-    def filter(time_channel_df: pd.DataFrame, flag = True):
+    def filter(time: np.ndarray, channel: np.ndarray, flag: np.ndarray =None):
         """
         Filter the time_channel data frame from alerted counts (pileup or overflow) and negative counts.
         Parameters
         ----------
-        time_channel_df: pd.Dataframe
-         unfiltered list mode table
-        flag: bool (default True)
-        is there a pileup or overflow indicator
+        time: np.ndarray
+         unfiltered time vector
+        channel: np.ndarray
+         unfiltered channel vector
+        flag : np.ndarray, optional
+        Array indicating pileup/overflow events. Non-zero values are rejected.
         Returns
         -------
-        pd.DataFrame
-         filtered dataframe of time - channel
+        valid_indecies
+            valid events indeceies
         """
+
         # 3 data columns for each row
-        if flag:
-            filtered_data = time_channel_df[
-                (time_channel_df['flag'] == 0) & (time_channel_df['channel'] >= 0)
-                ]
+        if flag is not None:
+            valid_indices = (flag == 0) & (channel >= 0)
         else:
-            filtered_data = time_channel_df[(time_channel_df['channel'] >= 0)]
-        return filtered_data[['time', 'channel']]
+            valid_indices = (channel >= 0)
+        return valid_indices
 
     @staticmethod
-    def to_spectrum(time_channel_df: pd.DataFrame,
-                    energy_calibration_poly=np.poly1d([1, 0]), fwhm_calibration=None, num_of_channels=2 ** 14):
+    def from_file(sourcefile, energy_calibration=None, fwhm_calibration=None,
+                  num_of_channels=2**14, chunk_size=100_000, **kwargs):
         """
-        Filter the time_channel file from pileup and negative counts,
-        then transform data to spectrum using the calibrations
-        If an alert flag was used in the MCA ot should be 0 to be accounted as a valid count.
+        Parse a large list-mode file into a Spectrum.
+        The file is read in chunks to avoid loading the entire dataset
+        into memory. Each chunk is filtered and accumulated into the
+        final histogram.
 
         Parameters
         ----------
-        time_channel_df: pd.DataFrame
-        a table of time - channel, also time - channel - alert-flag is optional
-        energy_calibration_poly: numpy.poly1d([a, b])
-         the energy calibration of the detector
-        fwhm_calibration: Callable
-        a function that given energy/channel(first raw in file) returns the fwhm
-        num_of_channels: int
-        the number of channels in the measurement
+        sourcefile : str or Path
+            Path to the list-mode file.
+        energy_calibration : callable, optional
+            Energy calibration function.
+        fwhm_calibration : callable, optional
+            Detector resolution calibration.
+        num_of_channels : int
+            Number of channels in the spectrum.
+        chunk_size : int
+            Number of rows to read per chunk.
+        **kwargs
+            Additional arguments passed to `pd.read_csv`.
+
         Returns
         -------
         Spectrum
-         the final spectrum
         """
-        time_channel_df = TimeChannelParser.filter(time_channel_df)
-        spectrum_df = TimeChannelParser.counts_in_time_into_spectrum(time_channel_df, num_of_channels)
-        return Spectrum.from_dataframe(spectrum_df, energy_calibration_poly, fwhm_calibration)
 
-    @classmethod
-    def counts_in_time_into_spectrum(cls, time_channel_df: pd.DataFrame, num_of_channels=2 ** 14):
+        if not isinstance(sourcefile, (str, Path)):
+            raise TypeError("sourcefile must be a path")
+
+        counts = np.zeros(num_of_channels, dtype=np.int64)
+
+        reader = pd.read_csv(sourcefile, chunksize=chunk_size, **kwargs)
+
+        for chunk in reader:
+
+            time = chunk["time"].to_numpy()
+            channel = chunk["channel"].to_numpy()
+
+            flag = chunk["flag"].to_numpy() if "flag" in chunk.columns else None
+
+            valid = TimeChannelParser.filter(time, channel, flag)
+            channel = channel[valid]
+
+            counts += np.bincount(channel, minlength=num_of_channels)
+
+        counts[-1] = 0
+
+        spectrum_df = pd.DataFrame({
+            "channel": np.arange(num_of_channels),
+            "counts": counts
+        })
+
+        return Spectrum.from_dataframe(
+            spectrum_df,
+            channel_col="channel",
+            counts_col="counts",
+            axis_calib=energy_calibration,
+            resolution_calib=fwhm_calibration
+        )
+
+    @staticmethod
+    def from_dataframe(df, energy_calibration=None, fwhm_calibration=None,
+                       num_of_channels=2**14):
         """
-        Takes a dataframe of time stamp and counts  and turn it into spectrum.
+        Convert an in-memory time-channel dataframe into a Spectrum.
 
         Parameters
         ----------
-        time_channel_df: pd.DataFrame
-        a table of time - channel
-        num_of_channels: int default = 2**14
-        The number of channels in the detector
+        df : pd.DataFrame
+            DataFrame containing at least a 'channel' column.
+            Optional columns: 'time', 'flag'.
+        num_of_channels : int
+            Number of detector channels.
+
         Returns
         -------
-        pd.DataFrame
-         filtered dataframe of the time channel file
+        Spectrum
         """
-        # Use NumPy histogram instead of Pandas' value_counts for speed
-        channel_array = time_channel_df['channel'].to_numpy()
-        counts = np.bincount(channel_array, minlength=num_of_channels)
-        counts[-1] = 0
-        return pd.DataFrame({'counts':counts,
-                             'channel': np.arange(num_of_channels)})
 
+        time = df["time"].to_numpy()
+        channel = df["channel"].to_numpy()
+        flag = df["flag"].to_numpy() if "flag" in df.columns else None
+
+        valid = TimeChannelParser.filter(time, channel, flag)
+        channel = channel[valid]
+
+        counts = np.bincount(channel, minlength=num_of_channels)
+        counts[-1] = 0
+
+        spectrum_df = pd.DataFrame({
+            "channel": np.arange(num_of_channels),
+            "counts": counts
+        })
+
+        return Spectrum.from_dataframe(
+            spectrum_df,
+            channel_col="channel",
+            counts_col="counts",
+            axis_calib=energy_calibration,
+            resolution_calib=fwhm_calibration
+        )
 
