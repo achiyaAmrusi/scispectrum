@@ -1,26 +1,27 @@
 import numpy as np
 from pyspectrum.identification.kernels.mexican_hat import gaussian_2_dev
 from pyspectrum.utils.gaussian import GAUSSIAN_FWHM_TO_SIGMA
+from typing import Callable
 
 class Convolution:
     """
-    Convolution with a zero-area kernel of variable width.
+    Convolution with a zero-area kernel of variable resolution.
 
     This class performs a localized convolution suitable for
     peak/domain detection in Poisson-limited spectra.
 
     Parameters
     ----------
-    width : Callable
-        Function width(x) -> FWHM at domain value x
+    resolution : Callable
+        Function resolution(x) -> FWHM at domain value x
     kernel : Callable
         Zero-area kernel function k(x, center, fwhm)
     window_fwhm : float
         How many FWHMs to include around the center for the kernel window (default=3)
     """
 
-    def __init__(self, width, kernel=gaussian_2_dev, window_fwhm=3.0):
-        self.width = width
+    def __init__(self, resolution: Callable[[float], float], kernel=gaussian_2_dev, window_fwhm=3.0):
+        self.resolution = resolution
         self.kernel = kernel
         self.window_fwhm = window_fwhm
 
@@ -29,7 +30,7 @@ class Convolution:
         Compute kernel values on a local window.
         """
         x0 = domain[center_idx]
-        fwhm = self.width(x0)
+        fwhm = self.resolution(x0)
 
         dx = domain[1] - domain[0]
         integration_radius = int(self.window_fwhm * fwhm / dx)
