@@ -6,6 +6,7 @@ from uncertainties import ufloat, nominal_value, UFloat
 from uncertainties.unumpy import nominal_values, std_devs, uarray
 from pyspectrum.fitting.std_gaussian_fitting import GaussianWithBGFitting
 import operator
+from .domain import Domain
 
 class Peak:
     """
@@ -219,6 +220,17 @@ class Peak:
         peak_no_bg = xr.DataArray(data=peak_no_bg, coords=self._xr_peak.coords)
 
         return peak_no_bg
+
+    @staticmethod
+    def from_domain(domain:Domain):
+        daxis = domain.spectrum.axis[1] - domain.spectrum.axis[0]
+        domain_center = int((domain.start+domain.stop)/2)
+        ch_half_fwhm = int((domain.spectrum.resolution_calib(domain_center) / daxis)/2)
+        background_left = domain.spectrum[domain.start-ch_half_fwhm:domain.start].mean().item()
+        background_right = domain.spectrum[domain.stop:domain.stop+ch_half_fwhm].mean().item()
+        return Peak(domain.data,
+                    ubackground_l=ufloat(background_left, background_left**0.5),
+                    ubackground_r=ufloat(background_right, background_right**0.5))
 # make Peak to behave like xarray
     def __getattr__(self, name):
         return getattr(self._xr_peak, name)  # Delegate attribute access to xarray

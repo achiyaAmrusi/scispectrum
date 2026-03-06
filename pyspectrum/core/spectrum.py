@@ -92,14 +92,17 @@ class Spectrum:
 
     @classmethod
     def from_dataframe(cls, df, channel_col="channel", counts_col="counts",
+                       *,
                        axis_calib: Optional[AxisCalibration] = None,
-                       resolution_calib: Optional[ResolutionCalibration] = None):
+                       resolution_calib: Optional[ResolutionCalibration] = None,
+                       metadata: Optional[dict] = None):
         """Create Spectrum from pandas DataFrame."""
         return cls(
             counts=df[counts_col].to_numpy(),
             channels=df[channel_col].to_numpy(),
             axis_calib=axis_calib,
-            resolution_calib=resolution_calib
+            resolution_calib=resolution_calib,
+            metadata=metadata
         )
 
     # ---------------------------
