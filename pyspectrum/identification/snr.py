@@ -26,22 +26,24 @@ class SNRFinder(DomainFinder):
     (e.g. peak fitting, background modeling, or Doppler integration).
     """
 
-    def __init__(self, convolution, n_sigma_threshold=4.0, persistence_factor=0.5):
+    def __init__(self, convolution, n_sigma_signal_threshold=4.0, n_sigma_bg_threshold=2.0 , persistence_factor=0.5):
         """
         Parameters
         ----------
         convolution : Convolution
             Convolution object used to compute the SNR spectrum.
 
-        n_sigma_threshold : float, optional
+        n_sigma_signal_threshold : float, optional
             SNR threshold used to detect candidate signal points.
 
+        n_sigma_bg_threshold : float, optional
+            SNR threshold used to determine the peak domain.
         persistence_factor : float, optional
             Fraction of the detector FWHM used as a persistence window when
             determining the domain edges.
 
             When expanding a detected peak, the algorithm requires that the
-            SNR remains below `n_sigma_threshold` for a continuous region of
+            SNR remains below `n_sigma_signal_threshold` for a continuous region of
             width:
 
                 persistence_factor × FWHM
@@ -52,8 +54,10 @@ class SNRFinder(DomainFinder):
 
             Default is 0.5.
         """
+
         self.convolution = convolution
-        self.n_sigma_threshold = n_sigma_threshold
+        self.n_sigma_signal_threshold = n_sigma_signal_threshold
+        self.n_sigma_bg_threshold = n_sigma_bg_threshold
         self.persistence_factor = persistence_factor
 
         self._cached_spectrum = None
@@ -88,15 +92,20 @@ class SNRFinder(DomainFinder):
             List of detected signal domains.
         """
         n_sigma = self._get_n_sigma(spectrum)
+        daxis = spectrum.axis[1] - spectrum.axis[0]
 
         domains = []
         idx = 0
         n = len(n_sigma)
 
         while idx < n:
-            if n_sigma[idx] >= self.n_sigma_threshold:
+            if n_sigma[idx] >= self.n_sigma_signal_threshold:
                 lo, hi = self._expand_from_index(spectrum, n_sigma, idx)
-                domains.append(Domain(spectrum, lo, hi))
+                ch_fwhm = spectrum.resolution_calib(spectrum.axis[idx]) / daxis
+                ch_fwhm = np.max([int(round(ch_fwhm)), 1])
+
+                if (hi-lo)>=ch_fwhm:
+                    domains.append(Domain(spectrum, lo, hi))
                 idx = hi + 1  # skip processed region
             else:
                 idx += 1
@@ -127,7 +136,7 @@ class SNRFinder(DomainFinder):
             Inclusive (lo, hi) indices defining the domain.
         """
 
-        if n_sigma[index]<self.n_sigma_threshold:
+        if n_sigma[index]<self.n_sigma_signal_threshold:
             raise ValueError("value at index dont cross threshold")
 
         n = n_sigma.shape[0]
@@ -142,7 +151,7 @@ class SNRFinder(DomainFinder):
         lo = index
         while lo > 0:
             persistence_left = np.max([0, lo-persistence])
-            if np.all(n_sigma[persistence_left:lo] < self.n_sigma_threshold):
+            if np.all(np.abs(n_sigma[persistence_left:lo]) < self.n_sigma_bg_threshold):
                 break
             lo -= 1
 
@@ -150,7 +159,7 @@ class SNRFinder(DomainFinder):
         hi = index
         while hi < n - 1:
             persistence_right = np.min([n-1,hi+persistence])
-            if np.all(n_sigma[hi:persistence_right] < self.n_sigma_threshold):
+            if np.all(np.abs(n_sigma[hi:persistence_right]) < self.n_sigma_bg_threshold):
                 hi -= 1 # to aligen hi
                 break
             hi += 1

@@ -1,7 +1,7 @@
 import numpy as np
 import xarray as xr
 from typing import Callable
-from pyspectrum.utils.smoothing import resolution_adaptive_smoothing
+from pyspectrum.utils.smoothing import adaptive_gaussian_smoothing
 from pyspectrum.background.base import BackgroundEstimator
 from pyspectrum.core.spectrum import Spectrum
 from .utils import ll_transform, inv_ll_transform
@@ -61,7 +61,7 @@ class SNIPBackground(BackgroundEstimator):
         if smooth:
             if resolution is None:
                 raise ValueError("Resolution callable must be provided for smoothing.")
-            z = resolution_adaptive_smoothing(x, z, resolution=resolution)
+            z = adaptive_gaussian_smoothing(x, z, resolution=resolution)
 
         n = len(z)
         for k in range(1, self.iterations + 1):

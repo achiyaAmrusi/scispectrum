@@ -3,7 +3,7 @@ from scipy.ndimage import gaussian_filter1d
 from pyspectrum.utils.gaussian import fwhm_to_sigma
 from typing import Callable
 
-def resolution_adaptive_smoothing(
+def adaptive_gaussian_smoothing(
     x,
     y,
     *,
@@ -60,3 +60,29 @@ def resolution_adaptive_smoothing(
     )
 
     return y_smooth
+
+def gaussian_smoothing(x, y, fwhm):
+    """
+    Gaussian smoothing with constant width.
+
+    Parameters
+    ----------
+    x : ndarray
+        Axis values (uniformly spaced).
+
+    y : ndarray
+        Signal values.
+
+    fwhm : float
+        Gaussian FWHM in x-units.
+
+    Returns
+    -------
+    ndarray
+    """
+    dx = x[1] - x[0]
+
+    sigma_x = fwhm_to_sigma(fwhm)
+    sigma_bins = sigma_x / dx
+
+    return gaussian_filter1d(y, sigma=sigma_bins, mode="nearest")

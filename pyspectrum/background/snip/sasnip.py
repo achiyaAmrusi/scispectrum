@@ -2,7 +2,7 @@ import numpy as np
 from pyspectrum.background.base import BackgroundEstimator
 from pyspectrum.core.spectrum import Spectrum
 from .utils import ll_transform, inv_ll_transform
-from pyspectrum.utils.smoothing import resolution_adaptive_smoothing
+from pyspectrum.utils.smoothing import adaptive_gaussian_smoothing
 from typing import Callable
 
 
@@ -114,7 +114,7 @@ class SASNIPBackground(BackgroundEstimator):
         if smooth:
             if (self.fwhm_calibration is None):
                 raise ValueError("Resolution callable must be provided for smoothing.")
-            z = resolution_adaptive_smoothing(x, z, resolution=self.fwhm_calibration)
+            z = adaptive_gaussian_smoothing(x, z, resolution=self.fwhm_calibration)
 
         for i in range(n):
             fwhm = self.fwhm_calibration(x[i])

@@ -136,10 +136,9 @@ class DetectorCalibration:
 
         # --- Energy calibration ---
         e_params, _ = self.energy_model.fit(
-            centers_ch,
-            self.known_axis,
-            p0=energy_p0,
-        )
+            x=centers_ch,
+            y=self.known_axis,
+            p0=energy_p0)
         energy_func = self.energy_model.generator(e_params)
         axis_calib = AxisCalibration(energy_func, name="energy")
 

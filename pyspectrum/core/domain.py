@@ -49,14 +49,15 @@ class Domain:
 
         return da.assign_attrs(attrs)
 
-    # ------------------------------------------------------------------
-    # Basic properties
-    # ------------------------------------------------------------------
-
     @property
     def indices(self) -> np.ndarray:
         return np.arange(self.start, self.stop)
 
+    @property
+    def local_resolution(self):
+        axis = self.data.coords[self.spectrum.axis_name].values
+        center = axis.mean()
+        return self.spectrum.resolution_calib(center)
     # ------------------------------------------------------------------
     # Peak conversion
     # ------------------------------------------------------------------

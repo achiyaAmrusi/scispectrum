@@ -79,6 +79,6 @@ class Convolution:
         sigma = np.sqrt(var)
         n_sigma = np.zeros_like(conv)
         mask = sigma > 0
-        n_sigma[mask] = np.abs(conv[mask] / sigma[mask])
+        n_sigma[mask] = conv[mask] / sigma[mask]
 
         return conv, sigma, n_sigma

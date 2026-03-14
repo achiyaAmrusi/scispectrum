@@ -10,7 +10,7 @@ This module is under active development.
 
 Intended purpose:
 -----------------
-Method to fit domains
+Method to fit domain with gaussians and error function background
 
 Planned changes:
 ----------------
