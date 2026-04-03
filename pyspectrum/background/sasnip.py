@@ -1,7 +1,7 @@
 import numpy as np
 from pyspectrum.background.base import BackgroundEstimator
 from pyspectrum.core.spectrum import Spectrum
-from .utils import ll_transform, inv_ll_transform
+from .snip_utils import ll_transform, inv_ll_transform
 from pyspectrum.utils.smoothing import adaptive_gaussian_smoothing
 from typing import Callable
 
@@ -51,15 +51,15 @@ class SASNIPBackground(BackgroundEstimator):
         self.area_tol = area_tol
         self.min_window = min_window
 
-    def estimate(self, spectrum: Spectrum) -> np.ndarray:
+    def estimate(self, axis, counts) -> np.ndarray:
         """
         Estimate background using SASNIP.
 
         Parameters
         ----------
-        x : array_like
+        axis : array_like
             Axis values.
-        y : array_like
+        count : array_like
             Spectrum counts.
         smooth : bool
             If True, apply resolution-adaptive Gaussian smoothing before SASNIP.
@@ -69,16 +69,13 @@ class SASNIPBackground(BackgroundEstimator):
         bg : ndarray
             Estimated background.
         """
-        y = spectrum.counts
-        x = spectrum.axis
-
-        bg_prev = y
-        area_prev = np.trapz(bg_prev, x)
+        bg_prev = counts
+        area_prev = np.trapz(bg_prev, axis)
         t = self.t_initial
 
         for _ in range(self.max_outer_iterations):
-            bg_new = self._adaptive_snip(x, bg_prev, t)
-            area_new = np.trapz(bg_new, x)
+            bg_new = self._adaptive_snip(axis, bg_prev, t)
+            area_new = np.trapz(bg_new, axis)
 
             rel_diff = np.abs(area_new - area_prev) / max(area_prev, 1.0)
             if rel_diff < self.area_tol:
@@ -89,15 +86,15 @@ class SASNIPBackground(BackgroundEstimator):
 
         return bg_new
 
-    def _adaptive_snip(self, x: np.ndarray, y: np.ndarray, t: float, smooth=True) -> np.ndarray:
+    def _adaptive_snip(self, axis: np.ndarray, counts: np.ndarray, t: float, smooth=True) -> np.ndarray:
         """
         Single adaptive SNIP step on log-log transformed data.
 
         Parameters
         ----------
-        x : array_like
+        axis : array_like
             Axis values.
-        y : array_like
+        counts : array_like
             Spectrum counts.
         t : float
             Scaling factor for clipping window.
@@ -107,17 +104,17 @@ class SASNIPBackground(BackgroundEstimator):
         bg : ndarray
             Background after single SNIP step.
         """
-        z = ll_transform(y)
+        z = ll_transform(counts)
         n = len(z)
         z_new = z.copy()
 
         if smooth:
             if (self.fwhm_calibration is None):
                 raise ValueError("Resolution callable must be provided for smoothing.")
-            z = adaptive_gaussian_smoothing(x, z, resolution=self.fwhm_calibration)
+            z = adaptive_gaussian_smoothing(axis, z, resolution=self.fwhm_calibration)
 
         for i in range(n):
-            fwhm = self.fwhm_calibration(x[i])
+            fwhm = self.fwhm_calibration(axis[i])
             m = max(int(round(t * fwhm)), self.min_window)
 
             if i - m < 0 or i + m >= n:

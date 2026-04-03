@@ -258,3 +258,24 @@ def peak_fwhm(domain, **kwargs):
     widths, *_ = peak_widths(y, peak_indices, rel_height=0.5)
 
     return widths * dx
+
+def domain_bases(domain):
+    """
+    Estimate the left and right bases height by averaging a resolution size of the sides
+
+    Returns
+    -------
+    tuple
+        The height if each side
+    """
+
+    # Local resolution
+    local_axis = domain.spectrum.axis[domain.indices]
+    local_resolution = domain.spectrum.resolution_calib(local_axis).mean()/(2 * np.sqrt(2 * np.log(2)))
+    local_resolution_channel = max(int(local_resolution / (domain.spectrum.axis[1] - domain.spectrum.axis[0]) / 2), 3)
+
+    #
+    height_left = domain.data[:local_resolution_channel].mean().item()
+    height_right = domain.data[-local_resolution_channel:-1].mean().item()
+
+    return height_left, height_right

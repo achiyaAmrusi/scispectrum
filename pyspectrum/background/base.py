@@ -8,7 +8,7 @@ class BackgroundEstimator(ABC):
     """
 
     @abstractmethod
-    def estimate(self, spectrum: Spectrum, *kwargs) -> xr.DataArray:
+    def estimate(self, axis, counts, *kwargs) -> xr.DataArray:
         """
         Estimate background for a 1D spectrum.
 

@@ -3,8 +3,7 @@ import xarray as xr
 from typing import Callable
 from pyspectrum.utils.smoothing import adaptive_gaussian_smoothing
 from pyspectrum.background.base import BackgroundEstimator
-from pyspectrum.core.spectrum import Spectrum
-from .utils import ll_transform, inv_ll_transform
+from .snip_utils import ll_transform, inv_ll_transform
 
 
 class SNIPBackground(BackgroundEstimator):
@@ -15,9 +14,9 @@ class SNIPBackground(BackgroundEstimator):
     def __init__(self, iterations: int):
         self.iterations = int(iterations)
 
-    def estimate(self, spectrum: Spectrum) -> xr.DataArray:
+    def estimate(self, axis, counts, resolution: Callable[[np.ndarray], np.ndarray], smoothing=False) -> xr.DataArray:
         """
-        Perform SNIP background estimation on a Spectrum object.
+        Perform SNIP background estimation for a spectrum.
         The spectrum is log-log smoothed before subtraction using the resolution calibration.
 
         Parameters
@@ -29,11 +28,9 @@ class SNIPBackground(BackgroundEstimator):
         bg : DataArray
             Estimated background counts.
         """
-        y = spectrum.counts
-        x = spectrum.axis
-        background =  self.sinp(x,y, resolution=spectrum.resolution_calib)
+        background =  self.sinp(axis, counts, resolution=resolution)
 
-        return xr.DataArray(background, coords=spectrum.coords)
+        return background
 
     def sinp(self, x: np.ndarray, y: np.ndarray, resolution: Callable[[np.ndarray], np.ndarray] = None, smooth=True) -> np.ndarray:
         """
