@@ -22,6 +22,7 @@ class Domain:
         spectrum: Spectrum,
         start: int,
         stop: int,
+        background: np.ndarray = None
     ):
         if start < 0 or stop <= start:
             raise ValueError("Invalid domain bounds")
@@ -29,6 +30,13 @@ class Domain:
         self.spectrum = spectrum
         self.start = int(start)
         self.stop = int(stop)
+        if background is not None:
+            if not len(background) ==  (self.stop - self.start):
+                raise ValueError("Background length needs to match domain length")
+            else:
+                self._background = background
+        else:
+            self._background = None
 
     # ------------------------------------------------------------------
     # Core interface
@@ -37,9 +45,15 @@ class Domain:
 
     @property
     def data(self) -> xr.DataArray:
-        da = self.spectrum.xr_spectrum().isel(
-            **{self.spectrum.axis_name: slice(self.start, self.stop)}
-        )
+
+        if self.background is None:
+            da = self.spectrum.xr_spectrum().isel(
+                **{self.spectrum.axis_name: slice(self.start, self.stop)}
+            )
+        else:
+            da = self.spectrum.xr_spectrum().isel(
+                **{self.spectrum.axis_name: slice(self.start, self.stop)}
+            ) - self.background
 
         attrs = dict(da.attrs)
         attrs.update({
@@ -48,6 +62,10 @@ class Domain:
         })
 
         return da.assign_attrs(attrs)
+
+    @property
+    def background(self):
+        return self._background
 
     @property
     def indices(self) -> np.ndarray:
@@ -65,6 +83,13 @@ class Domain:
     def to_peak(self, fitter=None):
         from pyspectrum.core.peak import Peak
         return Peak.from_domain(self)
+
+    def set_background(self, background: np.ndarray | None):
+        if (background is not None) and (not len(background) == (self.stop - self.start)):
+            raise ValueError("Background length needs to match domain length")
+        else:
+            self._background = background
+        return self.data
 
     # ---------------------------
     # Array-like access

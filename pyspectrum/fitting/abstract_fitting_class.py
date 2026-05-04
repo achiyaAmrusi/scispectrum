@@ -12,21 +12,13 @@ class PeakFit(ABC):
     fit: callable
     given spectrum slice and fitting data (initial data which is required from the fitting methods) the function
     returns the fit
-    plot_fit: callable
-    plot the fit from the results of fitting methods
+    evaluate: callable
+    evaluate the fit from the results of fitting methods
     """
-
-    @property
-    @abstractmethod
-    def fit_type(self):
-        """
-        Abstract property for the type of fitting (e.g., Gaussian, Lorentzian).
-         """
-        pass
 
     @staticmethod
     @abstractmethod
-    def fit(spectrum_slice: xr.DataArray, **kwargs):
+    def fit(counts, axis, **kwargs):
         """
         Fit the given spectrum slice and return the fit properties.
         """
@@ -34,9 +26,9 @@ class PeakFit(ABC):
 
     @staticmethod
     @abstractmethod
-    def plot_fit(domain, fit_properties):
+    def evaluate(domain, fit_properties):
         """
-        Plot the results of the fit.
+        evaluate the result int the domain.
         """
         pass
 
