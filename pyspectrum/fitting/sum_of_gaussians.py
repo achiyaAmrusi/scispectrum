@@ -11,7 +11,7 @@ from pyspectrum.fitting.abstract_fitting_class import PeakFit
 
 
 
-class GaussianFitting(PeakFit):
+class SumOfGaussians(PeakFit):
 
     def __init__(self):
         """No initialization needed for now."""
