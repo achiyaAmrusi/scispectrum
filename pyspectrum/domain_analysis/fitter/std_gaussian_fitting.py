@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 from uncertainties import nominal_value, std_dev
-from pyspectrum.fitting.abstract_fitting_class import PeakFit
+from pyspectrum.domain_analysis.fitter.abstract_fitting_class import PeakFit
 
 
 class GaussianWithBGFitting(PeakFit):

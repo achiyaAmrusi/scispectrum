@@ -1,5 +1,4 @@
 import numpy as np
-import xarray as xr
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
 from pyspectrum.background.base import BackgroundEstimator

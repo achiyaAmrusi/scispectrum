@@ -1,7 +1,12 @@
+from typing import Callable
+
 import numpy as np
 import xarray as xr
+from numpy import ndarray
 from scipy.ndimage import gaussian_filter1d
 from pyspectrum.background.base import BackgroundEstimator
+from pyspectrum.identification import Convolution
+from pyspectrum.calibration import ResolutionCalibration
 
 class MinimaEnvelopeBackground(BackgroundEstimator):
     """
@@ -69,7 +74,11 @@ class MinimaEnvelopeBackground(BackgroundEstimator):
     # Main estimator
     # -------------------------------------------------
 
-    def estimate(self, axis, counts, resolution_calib, conv, iterations):
+    def estimate(self, axis: np.ndarray,
+                 counts: np.ndarray,
+                 resolution_calib:ResolutionCalibration,
+                 conv: Convolution,
+                 iterations: int)-> xr.DataArray:
 
         dx = axis[1] - axis[0]
         fwhm = np.array([resolution_calib(xi) for xi in axis])

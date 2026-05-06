@@ -67,13 +67,17 @@ class Spectrum:
         # Xarray representation
         self._xr = xr.DataArray(self.counts, coords={self.axis_name: self.axis}, dims=[self.axis_name])
 
+    # ------------------------------------------------------------------
+    # Core interface
+    # ------------------------------------------------------------------
+
+    @property
+    def data(self) -> xr.DataArray:
+        return self._xr
+
     # ---------------------------
     # Public methods
     # ---------------------------
-
-    def xr_spectrum(self) -> xr.DataArray:
-        """Return xarray representation of the spectrum."""
-        return self._xr
 
     def set_axis_calibration(self, axis_calib: AxisCalibration):
         """Set or update axis calibration."""
@@ -111,22 +115,22 @@ class Spectrum:
 
     def __getattr__(self, name):
         """Delegate attribute access to xarray DataArray."""
-        return getattr(self._xr, name)
+        return getattr(self.data, name)
 
     def __getitem__(self, key):
         """Allow indexing like spectrum[key]."""
-        return self._xr[key]
+        return self.data[key]
 
     def __repr__(self):
-        return repr(self._xr)
+        return repr(self.data)
 
     # ---------------------------
     # Arithmetic operations
     # ---------------------------
 
     def _apply_operation(self, other, op):
-        other_values = other._xr.values if isinstance(other, Spectrum) else other
-        result_counts = op(self._xr.values, other_values)
+        other_values = other.data.values if isinstance(other, Spectrum) else other
+        result_counts = op(self.data.values, other_values)
         return Spectrum(
             counts=result_counts,
             channels=self.channels,

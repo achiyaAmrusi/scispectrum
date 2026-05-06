@@ -4,7 +4,7 @@ import numpy as np
 import math
 from uncertainties import ufloat, nominal_value, UFloat
 from uncertainties.unumpy import nominal_values, std_devs, uarray
-from pyspectrum.fitting.std_gaussian_fitting import GaussianWithBGFitting
+from pyspectrum.domain_analysis.fitter.std_gaussian_fitting import GaussianWithBGFitting
 import operator
 from .domain import Domain
 
@@ -46,7 +46,7 @@ class Peak:
       Fit a Gaussian function to a peak in the spectrum and return fit parameters.
 
     - `fit_method_counts_under_fwhm(self)`:
-      Calculate the sum of counts within the Full Width at Half Maximum (FWHM) of a peak uding fitting method/
+      Calculate the sum of counts within the Full Width at Half Maximum (FWHM) of a peak uding fitter method/
 
     - `first_moment_method_center(self)`:
         Calculate the center (mean) of a peak in the spectrum
@@ -147,10 +147,10 @@ class Peak:
 
     def fit_method_counts_under_fwhm(self):
         """
-        Calculate the sum of counts within the Full Width at Half Maximum (FWHM) of a peak uding fitting method.
+        Calculate the sum of counts within the Full Width at Half Maximum (FWHM) of a peak uding fitter method.
 
         The function operates by the following steps:
-        1. Estimate the amplitude and fwhm of the specified peak using fitting
+        1. Estimate the amplitude and fwhm of the specified peak using fitter
         2. using the formula for the counts to return the counts number
         the formula is  0.761438079*A*np.sqrt(2 *pi)*(fwhm/(2*np.sqrt(2*np.log(2))))* 1/bin_energy_size
         where

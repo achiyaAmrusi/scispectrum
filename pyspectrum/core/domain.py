@@ -42,16 +42,15 @@ class Domain:
     # Core interface
     # ------------------------------------------------------------------
 
-
     @property
     def data(self) -> xr.DataArray:
 
         if self.background is None:
-            da = self.spectrum.xr_spectrum().isel(
+            da = self.spectrum.data.isel(
                 **{self.spectrum.axis_name: slice(self.start, self.stop)}
             )
         else:
-            da = self.spectrum.xr_spectrum().isel(
+            da = self.spectrum.data.isel(
                 **{self.spectrum.axis_name: slice(self.start, self.stop)}
             ) - self.background
 
@@ -84,12 +83,23 @@ class Domain:
         from pyspectrum.core.peak import Peak
         return Peak.from_domain(self)
 
-    def set_background(self, background: np.ndarray | None):
+    def subtract_background(self, background: np.ndarray | None):
+
+        """
+        Return a new Domain with a background attached.
+
+        The background is subtracted lazily when accessing `.data`.
+        The original Domain is not modified.
+        """
         if (background is not None) and (not len(background) == (self.stop - self.start)):
             raise ValueError("Background length needs to match domain length")
-        else:
-            self._background = background
-        return self.data
+
+        return Domain(
+            spectrum=self.spectrum,
+            start=self.start,
+            stop=self.stop,
+            background=background)
+
 
     # ---------------------------
     # Array-like access

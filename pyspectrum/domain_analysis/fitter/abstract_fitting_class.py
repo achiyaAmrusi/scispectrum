@@ -4,16 +4,16 @@ from abc import ABC, abstractmethod
 
 class PeakFit(ABC):
     """
-    Abstract base class for peak fitting methods.
-    Any peak fitting class must implement the `fit` and `plot_fit` methods.
+    Abstract base class for peak fitter methods.
+    Any peak fitter class must implement the `fit` and `plot_fit` methods.
     Must be implemented by subclasses.
     Methods
     ----------
     fit: callable
-    given spectrum slice and fitting data (initial data which is required from the fitting methods) the function
+    given spectrum slice and fitter data (initial data which is required from the fitter methods) the function
     returns the fit
     evaluate: callable
-    evaluate the fit from the results of fitting methods
+    evaluate the fit from the results of fitter methods
     """
 
     @staticmethod

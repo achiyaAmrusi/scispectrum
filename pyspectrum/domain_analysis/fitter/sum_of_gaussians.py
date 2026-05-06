@@ -2,14 +2,10 @@ import numpy as np
 import xarray as xr
 from scipy.optimize import curve_fit
 import warnings
-
 from pyspectrum.core.domain import Domain
-from pyspectrum.domain_characterization.morphology import  find_domain_peaks
+from pyspectrum.domain_analysis.characterization.morphology import  find_domain_peaks
 from pyspectrum.utils.gaussian import fwhm_to_sigma
-from pyspectrum.fitting.abstract_fitting_class import PeakFit
-
-
-
+from pyspectrum.domain_analysis.fitter.abstract_fitting_class import PeakFit
 
 class SumOfGaussians(PeakFit):
 
@@ -162,15 +158,13 @@ class SumOfGaussians(PeakFit):
         domain_values = domain.values
 
         try:
-            popt, pcov = curve_fit(
-                cls._flat_evaluate,
-                domain_axis,
-                domain_values,
-                p0=p0,
-                bounds=(lower, upper),
-                max_nfev=maxiter * len(p0),
-                method="trf",
-            )
+            popt, pcov = curve_fit(f=cls._flat_evaluate,
+                                   xdata=domain_axis,
+                                   ydata=domain_values,
+                                   p0=p0,
+                                   bounds=(lower, upper),
+                                   max_nfev=maxiter * len(p0),
+                                   method="trf",)
         except (ValueError, RuntimeError) as e:
             warnings.warn(f"Fit of domain [{domain_axis[0]}, {domain_axis[-1]}] failed: {e}")
             return False

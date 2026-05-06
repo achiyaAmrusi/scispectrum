@@ -23,7 +23,7 @@ class SNRFinder(DomainFinder):
 
     The resulting domains represent contiguous spectral regions that contain
     statistically significant signal and can be used for further analysis
-    (e.g. peak fitting, background modeling, or Doppler integration).
+    (e.g. peak fitter, background modeling, or Doppler integration).
     """
 
     def __init__(self, convolution, n_sigma_signal_threshold=4.0, n_sigma_bg_threshold=2.0 , persistence_factor=0.5):
