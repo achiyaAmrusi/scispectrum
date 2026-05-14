@@ -2,6 +2,7 @@ import numpy as np
 from scipy.signal import find_peaks, peak_widths, find_peaks_cwt
 from pyspectrum.utils.smoothing import gaussian_smoothing
 from copy import copy
+import numbers
 
 def find_domain_peaks(
     domain,
@@ -37,7 +38,6 @@ def find_domain_peaks(
     properties : dict
         Peak properties expressed in axis units when applicable.
     """
-
     da = domain.data
     axis_name = domain.spectrum.axis_name
 
@@ -51,6 +51,8 @@ def find_domain_peaks(
 
     kwargs = {}
     if prominence is not None:
+        if not isinstance(prominence, numbers.Real):
+            raise TypeError("prominence must be a real number")
         kwargs["prominence"] = prominence
 
     peaks, properties = find_peaks(y, **kwargs)

@@ -2,38 +2,60 @@ import numpy as np
 from scipy.signal import peak_widths
 from pyspectrum.domain_analysis.find_peaks import find_domain_peaks
 
-def count_peaks(domain, **kwargs):
+def domain_count_peaks(domain, prominence=None, **kwargs):
     """
     Count peaks inside a Domain.
 
     Parameters
     ----------
     domain : Domain
-
+        Domain to analyze.
+    prominence : float, optional
+        Minimum peak prominence.
+    kwargs : dict
+    to be passed into find_domain_peaks.
     Returns
     -------
     int
     """
-    peaks, _ = find_domain_peaks(domain, **kwargs)
+    peaks, _ = find_domain_peaks(domain, prominence=prominence, **kwargs)
     return len(peaks)
 
 
-def peak_positions(domain, **kwargs):
+def domain_peaks_position(domain, prominence=None, **kwargs):
     """
     Return peak positions in axis units.
+
+    Parameters
+    ----------
+    domain : Domain
+        Domain to analyze.
+    prominence : float, optional
+        Minimum peak prominence.
+    kwargs : dict
+    to be passed into find_domain_peaks.
 
     Returns
     -------
     ndarray
     """
-    peaks, _ = find_domain_peaks(domain, **kwargs)
+    peaks, _ = find_domain_peaks(domain, prominence=prominence, **kwargs)
 
     return peaks
 
 
-def peak_fwhm(domain, **kwargs):
+def domain_peaks_fwhm(domain, prominence=None, **kwargs):
     """
     Estimate FWHM of detected peaks using scipy.signal.peak_widths.
+
+    Parameters
+    ----------
+    domain : Domain
+        Domain to analyze.
+    prominence : float, optional
+        Minimum peak prominence.
+    kwargs : dict
+    to be passed into find_domain_peaks.
 
     Returns
     -------
@@ -41,7 +63,7 @@ def peak_fwhm(domain, **kwargs):
         FWHM estimates in axis units.
     """
 
-    peaks, properties = find_domain_peaks(domain, **kwargs)
+    peaks, properties = find_domain_peaks(domain, prominence=prominence, **kwargs)
 
     if len(peaks) == 0:
         return np.array([])
@@ -60,6 +82,13 @@ def domain_bases(domain):
     """
     Estimate the left and right bases height by averaging a resolution size of the sides
 
+    Parameters
+    ----------
+    domain : Domain
+        Domain to analyze.
+
+    kwargs : dict
+    to be passed into find_domain_peaks.
     Returns
     -------
     tuple
