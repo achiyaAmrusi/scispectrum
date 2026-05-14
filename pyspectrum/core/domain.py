@@ -90,6 +90,10 @@ class Domain:
         return np.arange(self.start, self.stop)
 
     @property
+    def axis(self) -> np.ndarray:
+        return self.spectrum.axis[self.indices]
+
+    @property
     def local_resolution(self):
         if self.spectrum.resolution_calib is None:
             raise ValueError("Spectrum must have resolution calibration")
