@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from pyspectrum.core import Spectrum
-
+from typing import Optional
+from pyspectrum.calibration import AxisCalibration, ResolutionCalibration
 
 class TimeChannelParser:
     """
@@ -29,13 +30,11 @@ class TimeChannelParser:
         pass
 
     @staticmethod
-    def filter(time: np.ndarray, channel: np.ndarray, flag: np.ndarray =None):
+    def filter(channel: np.ndarray, flag: np.ndarray =None):
         """
         Filter the time_channel data frame from alerted counts (pileup or overflow) and negative counts.
         Parameters
         ----------
-        time: np.ndarray
-         unfiltered time vector
         channel: np.ndarray
          unfiltered channel vector
         flag : np.ndarray, optional
@@ -54,7 +53,9 @@ class TimeChannelParser:
         return valid_indices
 
     @staticmethod
-    def from_file(sourcefile, energy_calibration=None, fwhm_calibration=None,
+    def from_file(sourcefile,
+                  axis_calib: Optional[AxisCalibration] = None,
+                  resolution_calib: Optional[ResolutionCalibration] = None,
                   num_of_channels=2**14, chunk_size=100_000, **kwargs):
         """
         Parse a large list-mode file into a Spectrum.
@@ -66,10 +67,10 @@ class TimeChannelParser:
         ----------
         sourcefile : str or Path
             Path to the list-mode file.
-        energy_calibration : callable, optional
-            Energy calibration function.
-        fwhm_calibration : callable, optional
-            Detector resolution calibration.
+        axis_calib : AxisCalibration, optional
+            Axis calibration mapping channels -> physical values.
+        resolution_calib : ResolutionCalibration, optional
+            Optional resolution calibration.
         num_of_channels : int
             Number of channels in the spectrum.
         chunk_size : int
@@ -86,17 +87,17 @@ class TimeChannelParser:
             raise TypeError("sourcefile must be a path")
 
         counts = np.zeros(num_of_channels, dtype=np.int64)
-
         reader = pd.read_csv(sourcefile, chunksize=chunk_size, **kwargs)
 
         for chunk in reader:
-
-            time = chunk["time"].to_numpy()
             channel = chunk["channel"].to_numpy()
 
-            flag = chunk["flag"].to_numpy() if "flag" in chunk.columns else None
+            if "flag" in chunk.columns:
+                flag = chunk["flag"].to_numpy()
+            else:
+                flag = None
 
-            valid = TimeChannelParser.filter(time, channel, flag)
+            valid = TimeChannelParser.filter(channel, flag)
             channel = channel[valid]
 
             counts += np.bincount(channel, minlength=num_of_channels)
@@ -105,19 +106,23 @@ class TimeChannelParser:
 
         spectrum_df = pd.DataFrame({
             "channel": np.arange(num_of_channels),
-            "counts": counts
+            "counts": counts,
+            "counts_error": np.sqrt(counts)
         })
 
         return Spectrum.from_dataframe(
             spectrum_df,
             channel_col="channel",
             counts_col="counts",
-            axis_calib=energy_calibration,
-            resolution_calib=fwhm_calibration
+            counts_error_col="counts_error",
+            axis_calib=axis_calib,
+            resolution_calib=resolution_calib
         )
 
     @staticmethod
-    def from_dataframe(df, energy_calibration=None, fwhm_calibration=None,
+    def from_dataframe(df,
+                       axis_calib: Optional[AxisCalibration] = None,
+                       resolution_calib: Optional[ResolutionCalibration] = None,
                        num_of_channels=2**14):
         """
         Convert an in-memory time-channel dataframe into a Spectrum.
@@ -127,6 +132,10 @@ class TimeChannelParser:
         df : pd.DataFrame
             DataFrame containing at least a 'channel' column.
             Optional columns: 'time', 'flag'.
+        axis_calib : AxisCalibration, optional
+            Axis calibration mapping channels -> physical values.
+        resolution_calib : ResolutionCalibration, optional
+            Optional resolution calibration.
         num_of_channels : int
             Number of detector channels.
 
@@ -134,12 +143,16 @@ class TimeChannelParser:
         -------
         Spectrum
         """
+        if "channel" not in df.columns:
+            raise ValueError(f"DataFrame must contain a 'channel' column. Found: {list(df.columns)}")
 
-        time = df["time"].to_numpy()
         channel = df["channel"].to_numpy()
-        flag = df["flag"].to_numpy() if "flag" in df.columns else None
+        if "flag" in df.columns:
+            flag = df["flag"].to_numpy()
+        else:
+            flag=None
 
-        valid = TimeChannelParser.filter(time, channel, flag)
+        valid = TimeChannelParser.filter(channel, flag)
         channel = channel[valid]
 
         counts = np.bincount(channel, minlength=num_of_channels)
@@ -147,14 +160,16 @@ class TimeChannelParser:
 
         spectrum_df = pd.DataFrame({
             "channel": np.arange(num_of_channels),
-            "counts": counts
+            "counts": counts,
+            "counts_error": np.sqrt(counts)
         })
 
         return Spectrum.from_dataframe(
             spectrum_df,
             channel_col="channel",
             counts_col="counts",
-            axis_calib=energy_calibration,
-            resolution_calib=fwhm_calibration
+            counts_error_col="counts_error",
+            axis_calib=axis_calib,
+            resolution_calib=resolution_calib
         )
 
