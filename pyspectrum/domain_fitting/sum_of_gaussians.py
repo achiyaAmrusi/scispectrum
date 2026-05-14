@@ -13,7 +13,7 @@ class SumOfGaussians(PeakFit):
         """No initialization needed for now."""
 
     @staticmethod
-    def _flat_evaluate(axis: np.ndarray, *params) -> np.ndarray:
+    def flat_evaluate(axis: np.ndarray, *params) -> np.ndarray:
         """
         Wrapper around ``evaluate`` that accepts a flat parameter vector,
         as required by ``scipy.optimize.curve_fit``.
@@ -45,13 +45,12 @@ class SumOfGaussians(PeakFit):
         np.ndarray, shape (N,)
         """
 
-
         p0 = np.empty(3 * len(fit_result["amplitude"].values))
         p0[0::3] = fit_result["amplitude"].values
         p0[1::3] = fit_result["fwhm"].values
         p0[2::3] = fit_result["center"].values
 
-        return cls._flat_evaluate(axis, *p0)
+        return cls.flat_evaluate(axis, *p0)
 
     @staticmethod
     def _initial_guess(
@@ -128,20 +127,42 @@ class SumOfGaussians(PeakFit):
         Parameters
         ----------
         domain : Domain
+            Spectral domain to fit.
         smooth : bool
-            Smooth before peak detection.
+            Whether to smooth the domain before peak detection. Default is True.
         smoothing_fwhm_scale : float
-            Smoothing scale relative to detector resolution. Keep below 0.5.
+            Smoothing scale relative to the detector resolution (FWHM).
+            Should be kept below 0.5 to avoid over-smoothing. Default is 0.3.
         prominence : float, optional
-            Minimum peak prominence for detection.
+            Minimum peak prominence for detection. If None, estimated automatically.
         maxiter : int
-            Max optimizer iterations per parameter.
+            Maximum number of optimizer iterations per parameter. Default is 100.
 
         Returns
         -------
         xr.Dataset
-            Variables ``amplitude``, ``fwhm``, ``center`` (coordinate ``i``)
-            and ``covariance`` (shape 3K × 3K). Returns ``False`` if fit fails.
+            Dataset with the following variables:
+
+            Per-peak variables (coordinate ``i`` of length K):
+                - ``amplitude`` : peak amplitudes.
+                - ``fwhm``      : peak full widths at half maximum.
+                - ``center``    : peak center positions in axis units.
+
+            Statistical variables (coordinate ``param`` of length 3K,
+            ordered as ``amplitude_0, fwhm_0, center_0, amplitude_1, ...``):
+                - ``mean``       : flat parameter vector, aligned with ``covariance``.
+                - ``covariance`` : 3K × 3K parameter covariance matrix from the fit.
+                                   Can be used directly with
+                                   ``scipy.stats.multivariate_normal(mean, covariance)``
+                                   for uncertainty estimation.
+
+            Returns ``False`` if no peaks are detected or the fit fails.
+
+        Warns
+        -----
+        UserWarning
+            If no peaks are detected in the domain, or if the optimizer fails to converge.
+
         """
         p0 = cls._initial_guess(domain, smooth=smooth,
                                  smoothing_fwhm_scale=smoothing_fwhm_scale,
@@ -158,23 +179,32 @@ class SumOfGaussians(PeakFit):
         domain_values = domain.values
 
         try:
-            popt, pcov = curve_fit(f=cls._flat_evaluate,
+            popt, pcov = curve_fit(f=cls.flat_evaluate,
                                    xdata=domain_axis,
                                    ydata=domain_values,
                                    p0=p0,
                                    bounds=(lower, upper),
                                    max_nfev=maxiter * len(p0),
-                                   method="trf",)
+                                   method="trf", )
         except (ValueError, RuntimeError) as e:
             warnings.warn(f"Fit of domain [{domain_axis[0]}, {domain_axis[-1]}] failed: {e}")
             return False
 
+        param_names = [f"{name}_{i}"
+                       for i in range(n_peaks)
+                       for name in ("amplitude", "fwhm", "center")]
+
         return xr.Dataset(
             data_vars={
-                "amplitude":  ("i", popt[0::3]),
-                "fwhm":       ("i", popt[1::3]),
-                "center":     ("i", popt[2::3]),
+                "amplitude": ("i", popt[0::3]),
+                "fwhm": ("i", popt[1::3]),
+                "center": ("i", popt[2::3]),
+                "flat_mean": ("param", popt),
                 "covariance": (["param", "param_"], pcov),
             },
-            coords={"i": np.arange(n_peaks)},
+            coords={
+                "i": np.arange(n_peaks),
+                "param": param_names,
+                "param_": param_names,
+            },
         )
