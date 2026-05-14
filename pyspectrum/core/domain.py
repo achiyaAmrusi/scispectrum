@@ -63,6 +63,25 @@ class Domain:
         return da.assign_attrs(attrs)
 
     @property
+    def data_with_errors(self) -> xr.DataArray:
+        if self.background is None:
+            da = self.spectrum.data_with_errors.isel(
+                **{self.spectrum.axis_name: slice(self.start, self.stop)}
+            )
+        else:
+            da = self.spectrum.data_with_errors.isel(
+                **{self.spectrum.axis_name: slice(self.start, self.stop)}
+            ) - self.background
+
+        attrs = dict(da.attrs)
+        attrs.update({
+            "domain_start": self.start,
+            "domain_stop": self.stop,
+        })
+
+        return da.assign_attrs(attrs)
+
+    @property
     def background(self):
         return self._background
 
@@ -72,16 +91,11 @@ class Domain:
 
     @property
     def local_resolution(self):
+        if self.spectrum.resolution_calib is None:
+            raise ValueError("Spectrum must have resolution calibration")
         axis = self.data.coords[self.spectrum.axis_name].values
         center = axis.mean()
         return self.spectrum.resolution_calib(center)
-    # ------------------------------------------------------------------
-    # Peak conversion
-    # ------------------------------------------------------------------
-
-    def to_peak(self, fitter=None):
-        from pyspectrum.core.peak import Peak
-        return Peak.from_domain(self)
 
     def subtract_background(self, background: np.ndarray | None):
 

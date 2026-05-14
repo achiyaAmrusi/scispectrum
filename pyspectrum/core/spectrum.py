@@ -1,6 +1,7 @@
 import numpy as np
 import xarray as xr
 from typing import Optional
+from uncertainties.unumpy import uarray, nominal_values, std_devs
 from pyspectrum.calibration import AxisCalibration, ResolutionCalibration
 
 class Spectrum:
@@ -40,6 +41,7 @@ class Spectrum:
         counts: np.ndarray,
         channels: Optional[np.ndarray] = None,
         *,
+        counts_err: np.ndarray = None,
         axis_calib: Optional[AxisCalibration] = None,
         resolution_calib: Optional[ResolutionCalibration] = None,
         metadata: Optional[dict] = None,
@@ -52,6 +54,13 @@ class Spectrum:
         if not (isinstance(self.channels, np.ndarray) and self.channels.ndim == 1):
             raise TypeError("channels must be a 1D numpy array")
 
+        if counts_err is not None:
+            if not (isinstance(counts_err, np.ndarray) and counts_err.shape == counts.shape):
+                raise TypeError("counts error must have the same shape as counts")
+            self.counts_err = counts_err
+        else:
+            self.counts_err = None
+
         self.axis_calib = axis_calib
         self.resolution_calib = resolution_calib
         self.metadata = metadata or {}
@@ -61,7 +70,8 @@ class Spectrum:
             self.axis = self.axis_calib.apply(self.channels)
             self.axis_name = self.axis_calib.name or "axis"
         else:
-            self.axis = self.channels
+            self.axis_calib = AxisCalibration(lambda x: x, name="channel")
+            self.axis = self.axis_calib.apply(self.channels)
             self.axis_name = "channel"
 
         # Xarray representation
@@ -74,6 +84,12 @@ class Spectrum:
     @property
     def data(self) -> xr.DataArray:
         return self._xr
+
+    @property
+    def data_with_errors(self) -> xr.DataArray:
+        if self.counts_err is None:
+            raise ValueError("The spectrum has no errors")
+        return xr.DataArray(uarray(self.counts, self.counts_err), coords={self.axis_name: self.axis}, dims=[self.axis_name])
 
     # ---------------------------
     # Public methods
@@ -95,15 +111,76 @@ class Spectrum:
         self.resolution_calib = resolution_calib
 
     @classmethod
-    def from_dataframe(cls, df, channel_col="channel", counts_col="counts",
+    def from_dataframe(cls, df,counts_col="counts",
                        *,
+                       counts_error_col=None,
+                       channel_col=None,
                        axis_calib: Optional[AxisCalibration] = None,
                        resolution_calib: Optional[ResolutionCalibration] = None,
                        metadata: Optional[dict] = None):
-        """Create Spectrum from pandas DataFrame."""
+        """
+    Create a Spectrum from a pandas DataFrame.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input DataFrame containing spectrum data.
+    counts_col : str, optional
+        Name of the column containing counts. Defaults to "counts".
+    counts_error_col : str, optional
+        Name of the column containing counts uncertainties.
+        If None, no errors are assigned to the spectrum.
+    channel_col : str, optional
+        Name of the column containing channel indices.
+        If None, channels default to np.arange(len(counts)).
+    axis_calib : AxisCalibration, optional
+        Axis calibration mapping channels to physical values.
+        If None, the axis is set to the channel indices.
+    resolution_calib : ResolutionCalibration, optional
+        Resolution calibration for the spectrum.
+        If None, no resolution calibration is assigned.
+    metadata : dict, optional
+        Additional spectrum metadata (e.g. detector info, live time).
+
+    Returns
+    -------
+    Spectrum
+        A new Spectrum instance constructed from the DataFrame.
+
+    Raises
+    ------
+    ValueError
+        If any of the specified column names are not found in the DataFrame.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> df = pd.DataFrame({"channel": [0, 1, 2], "counts": [10, 20, 30], "err": [1, 2, 3]})
+    >>> spectrum = Spectrum.from_dataframe(df, channel_col="channel", counts_error_col="err")
+    """
+
+        if counts_col not in df.columns:
+            raise ValueError(
+                f"counts column '{counts_col}' not found in DataFrame. Available columns: {list(df.columns)}")
+
+        channels = None
+        if channel_col is not None:
+            if channel_col not in df.columns:
+                raise ValueError(
+                    f"channel column '{channel_col}' not found in DataFrame. Available columns: {list(df.columns)}")
+            channels = df[channel_col].to_numpy()
+
+        counts_err = None
+        if counts_error_col is not None:
+            if counts_error_col not in df.columns:
+                raise ValueError(
+                    f"counts error column '{counts_error_col}' not found in DataFrame. Available columns: {list(df.columns)}")
+            counts_err = df[counts_error_col].to_numpy()
+
         return cls(
             counts=df[counts_col].to_numpy(),
-            channels=df[channel_col].to_numpy(),
+            counts_err=counts_err,
+            channels=channels,
             axis_calib=axis_calib,
             resolution_calib=resolution_calib,
             metadata=metadata
@@ -129,16 +206,44 @@ class Spectrum:
     # ---------------------------
 
     def _apply_operation(self, other, op):
-        other_values = other.data.values if isinstance(other, Spectrum) else other
-        result_counts = op(self.data.values, other_values)
+
+        # --- self values ---
+        if self.counts_err is not None:
+            self_values = uarray(self.counts, self.counts_err)
+        else:
+            self_values = self.counts
+
+        # --- other values ---
+        if isinstance(other, Spectrum):
+
+            if other.counts_err is not None:
+                other_values = uarray(other.counts, other.counts_err)
+            else:
+                other_values = other.counts
+
+        else:
+            # scalar or ndarray
+            other_values = other
+
+        # --- operation ---
+        result = op(self_values, other_values)
+
+        # --- extract values/errors ---
+        if hasattr(result, "dtype") and result.dtype == object:
+            result_counts = nominal_values(result)
+            result_err = std_devs(result)
+        else:
+            result_counts = result
+            result_err = None
+
         return Spectrum(
             counts=result_counts,
+            counts_err=result_err,
             channels=self.channels,
             axis_calib=self.axis_calib,
             resolution_calib=self.resolution_calib,
             metadata=self.metadata.copy()
         )
-
     def __add__(self, other): return self._apply_operation(other, lambda x, y: x + y)
     def __sub__(self, other): return self._apply_operation(other, lambda x, y: x - y)
     def __mul__(self, other): return self._apply_operation(other, lambda x, y: x * y)
