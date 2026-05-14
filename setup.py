@@ -9,5 +9,12 @@ setup(
     license='MIT license',
     author='Achiya Yosef Amrusi',
     author_email='ahia.amrosi@mail.huji.ac.il',
-    description='spectrum and peak analysis tools'
+    description='spectrum and peak analysis tools',
+    install_requires=[
+        'xarray>=2022.6',
+        'numpy>=1.22.0,<3.0',
+        'uncertainties>=3.1',
+        'pandas>=1.5.0,<4.0',
+        'scipy>=1.8',
+    ],
 )
