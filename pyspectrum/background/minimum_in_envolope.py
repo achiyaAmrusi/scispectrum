@@ -76,9 +76,10 @@ class MinimaEnvelopeBackground(BackgroundEstimator):
 
     def estimate(self, axis: np.ndarray,
                  counts: np.ndarray,
+                 *,
                  resolution_calib:ResolutionCalibration,
                  conv: Convolution,
-                 iterations: int)-> xr.DataArray:
+                 iterations: int = 20)-> xr.DataArray:
 
         dx = axis[1] - axis[0]
         fwhm = np.array([resolution_calib(xi) for xi in axis])

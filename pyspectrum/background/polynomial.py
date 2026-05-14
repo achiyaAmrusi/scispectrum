@@ -4,7 +4,7 @@ from pyspectrum.background.base import BackgroundEstimator
 
 class IterativePolyFit(BackgroundEstimator):
     """
-    Implementation of the "Baseline correction by improved iterative polynomial fitter with
+    Implementation of the "Baseline correction by improved iterative polynomial domain_fitting with
 automatic threshold"
     method by Gan, Ruan, and Mo (2006).
     This method use a polynomial to fit the backgroumd.
@@ -21,7 +21,7 @@ automatic threshold"
         last_fit = np.zeros_like(y)
         
         for i in range(self.max_iter):
-            # Step 1 & 2: Calculate the polynomial fitter result (b_k)
+            # Step 1 & 2: Calculate the polynomial domain_fitting result (b_k)
             # This is the 'calculate the b' part
             coeffs = np.polyfit(x, y_work, self.degree)
             current_fit = np.polyval(coeffs, x)
@@ -46,7 +46,7 @@ automatic threshold"
 class IterativePolyFitWithMinimum(BackgroundEstimator):
     """
     Improved Iterative Polynomial Fitting (Gan et al. 2006)
-    + local minimum value for fitter.
+    + local minimum value for domain_fitting.
     The minimum is taken differently in high and low SNR regions.
     Low SNR - minimal count.
     High SNR - filled using the minimum of surrounding values.
