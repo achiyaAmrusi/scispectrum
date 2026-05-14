@@ -3,9 +3,9 @@ import xarray as xr
 from scipy.optimize import curve_fit
 import warnings
 from pyspectrum.core.domain import Domain
-from pyspectrum.domain_analysis.characterization.morphology import  find_domain_peaks
+from pyspectrum.domain_analysis.morphology import  find_domain_peaks
 from pyspectrum.utils.gaussian import fwhm_to_sigma
-from pyspectrum.domain_analysis.fitter.abstract_fitting_class import PeakFit
+from pyspectrum.domain_fitting.abstract_fitting_class import PeakFit
 
 class SumOfGaussians(PeakFit):
 

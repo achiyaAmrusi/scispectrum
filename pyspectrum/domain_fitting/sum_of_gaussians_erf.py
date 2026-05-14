@@ -5,9 +5,9 @@ from scipy.special import erf
 import warnings
 
 from pyspectrum.core.domain import Domain
-from pyspectrum.domain_analysis.characterization.morphology import find_domain_peaks, domain_bases
+from pyspectrum.domain_analysis.morphology import find_domain_peaks, domain_bases
 from pyspectrum.utils.gaussian import fwhm_to_sigma
-from pyspectrum.domain_analysis.fitter.abstract_fitting_class import PeakFit
+from pyspectrum.domain_fitting.abstract_fitting_class import PeakFit
 
 
 class SumOfGaussiansErf(PeakFit):
