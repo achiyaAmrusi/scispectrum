@@ -110,6 +110,41 @@ class Spectrum:
             raise TypeError("resolution must be a ResolutionCalibration object")
         self.resolution_calib = resolution_calib
 
+    def domain(self, start_val: float, stop_val: float, background=None):
+        """
+        Create a Domain from physical axis values.
+
+        Parameters
+        ----------
+        start_val : float
+            Start value in axis units (e.g. keV).
+        stop_val : float
+            Stop value in axis units.
+        background : np.ndarray, optional
+            Background to subtract from the domain.
+
+        Returns
+        -------
+        Domain
+        """
+        from pyspectrum.core.domain import Domain  # lazy import to avoid circular dependency
+
+        axis = self.axis
+        indices = np.where((axis >= start_val) & (axis <= stop_val))[0]
+
+        if len(indices) == 0:
+            raise ValueError(
+                f"No channels found between {start_val} and {stop_val}. "
+                f"Axis range is [{axis.min():.3f}, {axis.max():.3f}]"
+            )
+
+        return Domain(
+            spectrum=self,
+            start=int(indices[0]),
+            stop=int(indices[-1] + 1),
+            background=background
+        )
+
     @classmethod
     def from_dataframe(cls, df,counts_col="counts",
                        *,
