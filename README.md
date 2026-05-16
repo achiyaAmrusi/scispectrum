@@ -190,3 +190,4 @@ MIT License. See [LICENSE](LICENSE) for details.
 Achiya Yosef Amrusi — [GitHub](https://github.com/achiyaAmrusi/pySpectrum)
 
 Contributions and feedback are welcome.
+
