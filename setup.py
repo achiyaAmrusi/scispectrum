@@ -1,13 +1,19 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='PySpectrum',
-    version='0.2',
-    packages=['pyspectrum', 'pyspectrum.peak', 'pyspectrum.spectrum', 'pyspectrum.calibration',
-              'pyspectrum.peak_fitting', 'pyspectrum.detector_parser', 'pyspectrum.peak_identification'],
+    version='0.3',
+    python_requires='>=3.11',
+    packages=find_packages(),
     url='https://github.com/achiyaAmrusi/pySpectrum',
     license='MIT license',
     author='Achiya Yosef Amrusi',
     author_email='ahia.amrosi@mail.huji.ac.il',
-    description='spectrum and peak analysis tools'
+    description='spectrum and peak analysis tools',
+    install_requires=[
+        'numpy>=2.0.0,<3.0',
+        'pandas>=2.3,<4.0',
+        'scipy>=1.14.0',
+        'xarray>=2024.6.0',
+        'uncertainties>=3.1'],
 )
