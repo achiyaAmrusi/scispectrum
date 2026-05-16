@@ -146,7 +146,7 @@ All custom classes integrate seamlessly with `Domain`, `Spectrum`, and the rest 
 
 ## Examples
 
-Full worked examples are available in the [examples directory](https://github.com/achiyaAmrusi/pySpectrum/tree/master/examples):
+Full worked examples are available in the [examples directory](https://github.com/achiyaAmrusi/pySpectrum/tree/main/examples):
 
 **Core**
 - [Loading a spectrum](./examples/Core/loading_spectrum.ipynb) — reading and constructing a `Spectrum` from data
