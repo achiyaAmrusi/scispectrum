@@ -32,7 +32,6 @@ def simple_spectrum():
 
     return Spectrum(
         counts=counts,
-        channels=channels,
         metadata={"source": "test"},
         resolution_calib=res
     )

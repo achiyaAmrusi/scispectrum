@@ -1,9 +1,9 @@
 import numpy as np
-import xarray as xr
 from typing import List, Tuple
 
 from pyspectrum.core.spectrum import Spectrum
-from pyspectrum.core.peak import Peak
+from pyspectrum.core.domain import Domain
+from pyspectrum.domain_analysis.single_peak import center_estimator, fwhm_estimator
 from pyspectrum.calibration.axis import AxisCalibration
 from pyspectrum.calibration.resolution import ResolutionCalibration
 from pyspectrum.calibration.models.energy_poly import PolynomialEnergyModel
@@ -96,11 +96,11 @@ class DetectorCalibration:
         fwhms = []
 
         for lo, hi in self.peak_domains:
-            peak = xr.DataArray(self.spectrum.counts[lo:hi],
-                                coords={'channel':np.arange(lo,hi)})
-            c, f = Peak.center_fwhm_estimator(peak)
-            centers.append(c)
-            fwhms.append(f)
+            domain = Domain(self.spectrum, start=lo, stop=hi)
+            c = center_estimator(domain)
+            f = fwhm_estimator(domain)
+            centers.append(float(c))
+            fwhms.append(float(f))
 
         return np.asarray(centers), np.asarray(fwhms)
 

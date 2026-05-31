@@ -7,14 +7,48 @@ from pyspectrum.core.spectrum import Spectrum
 
 class Domain:
     """
-    Domain represents a region of a Spectrum.
+    A contiguous region of a Spectrum, defined by index bounds.
 
-    A Domain is:
-    - contiguous in index space
-    - interpretation-light
-    - tied to a parent Spectrum
+    A Domain represents a slice of a parent Spectrum for localized
+    analysis — peak fitting, background subtraction, parameter
+    calculation, or any operation that applies to a sub-range of
+    the spectrum axis.
 
-    It exposes its data exclusively as an xarray.DataArray.
+    Parameters
+    ----------
+    spectrum : Spectrum
+        The parent spectrum this domain belongs to.
+    start : int
+        Start index into the spectrum (inclusive).
+    stop : int
+        Stop index into the spectrum (exclusive).
+    background : np.ndarray, optional
+        Background array to subtract from the domain counts.
+        Must match the domain length (stop - start).
+
+    Attributes
+    ----------
+    data : xr.DataArray
+        Domain counts as an xarray DataArray, with background
+        subtracted if provided.
+    data_with_errors : xr.DataArray
+        Domain counts with uncertainty via the uncertainties library.
+    background : np.ndarray or None
+        The background array, if set.
+    indices : np.ndarray
+        Array of spectrum indices covered by this domain.
+
+    Methods
+    -------
+    subtract_background(background)
+        Return a new Domain with a background array attached.
+        The original Domain is not modified.
+    local_resolution()
+        Estimate the detector resolution at the domain center,
+        requires resolution calibration on the parent Spectrum.
+    from_axis_values(spectrum, start_val, stop_val)
+        Construct a Domain from physical axis values rather than
+        channel indices (e.g. energy in keV).
     """
 
     def __init__(
@@ -117,7 +151,6 @@ class Domain:
             start=self.start,
             stop=self.stop,
             background=background)
-
 
     # ---------------------------
     # Array-like access

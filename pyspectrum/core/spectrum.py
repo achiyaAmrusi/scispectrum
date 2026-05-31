@@ -12,8 +12,6 @@ class Spectrum:
     ----------
     counts : np.ndarray
         1D array of measured counts.
-    channels : np.ndarray, optional
-        1D array of raw channel indices. Defaults to np.arange(len(counts)).
     axis_calib : AxisCalibration, optional
         Axis calibration mapping channels -> physical values.
     resolution_calib : ResolutionCalibration, optional
@@ -39,7 +37,6 @@ class Spectrum:
     def __init__(
         self,
         counts: np.ndarray,
-        channels: Optional[np.ndarray] = None,
         *,
         counts_err: np.ndarray = None,
         axis_calib: Optional[AxisCalibration] = None,
@@ -50,9 +47,7 @@ class Spectrum:
             raise TypeError("counts must be a 1D numpy array")
         self.counts = counts
 
-        self.channels = channels if channels is not None else np.arange(len(counts))
-        if not (isinstance(self.channels, np.ndarray) and self.channels.ndim == 1):
-            raise TypeError("channels must be a 1D numpy array")
+        self.channels = np.arange(len(counts))
 
         if counts_err is not None:
             if not (isinstance(counts_err, np.ndarray) and counts_err.shape == counts.shape):
@@ -215,7 +210,6 @@ class Spectrum:
         return cls(
             counts=df[counts_col].to_numpy(),
             counts_err=counts_err,
-            channels=channels,
             axis_calib=axis_calib,
             resolution_calib=resolution_calib,
             metadata=metadata
@@ -274,7 +268,6 @@ class Spectrum:
         return Spectrum(
             counts=result_counts,
             counts_err=result_err,
-            channels=self.channels,
             axis_calib=self.axis_calib,
             resolution_calib=self.resolution_calib,
             metadata=self.metadata.copy()

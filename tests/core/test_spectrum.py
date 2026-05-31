@@ -31,7 +31,6 @@ def spectrum():
     axis_calib = AxisCalibration(func=poly, name="channel")
     return Spectrum(
         counts=counts,
-        channels=channels,
         resolution_calib=res,
         axis_calib=axis_calib
     )

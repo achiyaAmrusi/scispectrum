@@ -43,14 +43,46 @@ def fwhm_edges(single_peak_domain: Domain):
     return left_edge, right_edge, half_max
 
 def _get_data(single_peak_domain: Domain):
-    if single_peak_domain.spectrum.data_with_errors is not None:
+    if single_peak_domain.spectrum.counts_err is not None:
         return single_peak_domain.data_with_errors
     return single_peak_domain.data
 
 
-def center_estimator(single_peak_domain: Domain):
-    """Estimate peak center as weighted centroid within the FWHM region.
-    Not suitable for noisy peaks — use a fit instead."""
+def center_estimator(single_peak_domain: Domain, center_tolerance=1e-1):
+    """
+    Estimate the peak center as a weighted centroid within the FWHM region:
+        center = Σ (I_i * x_i) / Σ I_i
+    where the sum runs over coordinates within the FWHM, with the FWHM
+    edges included at half-maximum intensity.
+
+    Parameters
+    ----------
+    single_peak_domain : Domain
+        Spectral domain containing a single isolated peak.
+        Must have a well-defined maximum and FWHM region.
+    center_tolerance : float, optional
+        Maximum acceptable fractional disagreement between the weighted
+        centroid and the parabolic center, expressed as a fraction of
+        the FWHM. Default is 0.1 (10% of FWHM).
+        If the values don't disagree, issue a warning
+
+    Returns
+    -------
+    float
+        Estimated peak center position in the spectrum's axis units.
+
+    Warns
+    -----
+    UserWarning
+        If the weighted centroid and parabolic center disagree by more
+        than `center_tolerance * FWHM`. This may indicate an asymmetric
+        or noisy peak. Consider using a Gaussian fit instead.
+
+    Notes
+    -----
+    - The parabolic center is estimated from the three points near
+      the maximum and is less sensitive to the overall peak shape.
+    """
     data = _get_data(single_peak_domain)
     nominal_data = nominal_values(data)
     coords = data.coords[single_peak_domain.spectrum.axis_name].values
@@ -64,9 +96,18 @@ def center_estimator(single_peak_domain: Domain):
     fwhm_data   = np.concatenate([[half_max],  data[fwhm_mask], [half_max]])
     weighted_center = ((fwhm_data * fwhm_coords).sum() / fwhm_data.sum())
 
-    if abs(nominal_value(weighted_center) - parabolic_center) / daxis > 2:
-        warnings.warn("Peak center estimation may be unreliable — peak might be noisy or asymmetric. "
-                      "Consider using a Gaussian fit instead.")
+    fwhm = right_edge - left_edge
+    tolerance = center_tolerance * fwhm  # warn if centers disagree by more than 10% of FWHM
+    if not np.isclose(
+            nominal_value(weighted_center),
+            parabolic_center,
+            atol=tolerance,
+            rtol=0):  # purely absolute — tolerance already scaled to FWHM
+        warnings.warn(
+            f"Weighted centroid and parabolic center disagree by more than "
+            f"{tolerance:.2f} — peak may be asymmetric or noisy. "
+            f"Consider using a Gaussian fit instead."
+        )
 
     return weighted_center
 
