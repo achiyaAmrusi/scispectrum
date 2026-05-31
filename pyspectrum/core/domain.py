@@ -1,6 +1,7 @@
 from typing import Optional, Dict, Any
 import numpy as np
 import xarray as xr
+from uncertainties.unumpy import uarray
 
 from pyspectrum.core.spectrum import Spectrum
 
@@ -23,8 +24,12 @@ class Domain:
     stop : int
         Stop index into the spectrum (exclusive).
     background : np.ndarray, optional
-        Background array to subtract from the domain counts.
+        Background values to subtract from the domain counts.
         Must match the domain length (stop - start).
+    background_err : np.ndarray, optional
+        Uncertainty (1-sigma) of the background estimate.
+        Must match the domain length. Only used in data_with_errors;
+        requires background to be set.
 
     Attributes
     ----------
@@ -33,14 +38,18 @@ class Domain:
         subtracted if provided.
     data_with_errors : xr.DataArray
         Domain counts with uncertainty via the uncertainties library.
+        When background_err is set, background uncertainty is combined
+        with spectrum Poisson uncertainty in quadrature.
     background : np.ndarray or None
-        The background array, if set.
+        The background values array, if set.
+    background_err : np.ndarray or None
+        The background uncertainty array, if set.
     indices : np.ndarray
         Array of spectrum indices covered by this domain.
 
     Methods
     -------
-    subtract_background(background)
+    subtract_background(background, background_err=None)
         Return a new Domain with a background array attached.
         The original Domain is not modified.
     local_resolution()
@@ -56,7 +65,8 @@ class Domain:
         spectrum: Spectrum,
         start: int,
         stop: int,
-        background: np.ndarray = None
+        background: np.ndarray = None,
+        background_err: np.ndarray = None,
     ):
         if start < 0 or stop <= start:
             raise ValueError("Invalid domain bounds")
@@ -64,13 +74,23 @@ class Domain:
         self.spectrum = spectrum
         self.start = int(start)
         self.stop = int(stop)
+        n = self.stop - self.start
+
         if background is not None:
-            if not len(background) ==  (self.stop - self.start):
+            if len(background) != n:
                 raise ValueError("Background length needs to match domain length")
-            else:
-                self._background = background
+            self._background = background
         else:
             self._background = None
+
+        if background_err is not None:
+            if self._background is None:
+                raise ValueError("background_err requires background to be set")
+            if len(background_err) != n:
+                raise ValueError("background_err length needs to match domain length")
+            self._background_err = background_err
+        else:
+            self._background_err = None
 
     # ------------------------------------------------------------------
     # Core interface
@@ -98,14 +118,13 @@ class Domain:
 
     @property
     def data_with_errors(self) -> xr.DataArray:
-        if self.background is None:
-            da = self.spectrum.data_with_errors.isel(
-                **{self.spectrum.axis_name: slice(self.start, self.stop)}
-            )
-        else:
-            da = self.spectrum.data_with_errors.isel(
-                **{self.spectrum.axis_name: slice(self.start, self.stop)}
-            ) - self.background
+        da = self.spectrum.data_with_errors.isel(
+            **{self.spectrum.axis_name: slice(self.start, self.stop)}
+        )
+
+        if self._background is not None:
+            bg = uarray(self._background, self._background_err) if self._background_err is not None else self._background
+            da = da - bg
 
         attrs = dict(da.attrs)
         attrs.update({
@@ -118,6 +137,10 @@ class Domain:
     @property
     def background(self):
         return self._background
+
+    @property
+    def background_err(self):
+        return self._background_err
 
     @property
     def indices(self) -> np.ndarray:
@@ -135,22 +158,29 @@ class Domain:
         center = axis.mean()
         return self.spectrum.resolution_calib(center)
 
-    def subtract_background(self, background: np.ndarray | None):
-
+    def subtract_background(self, background: np.ndarray | None, background_err: np.ndarray | None = None):
         """
         Return a new Domain with a background attached.
 
         The background is subtracted lazily when accessing `.data`.
         The original Domain is not modified.
+
+        Parameters
+        ----------
+        background_err : np.ndarray, optional
+            1-sigma uncertainty of the background. When provided,
+            propagated in quadrature with Poisson errors in ``data_with_errors``.
         """
-        if (background is not None) and (not len(background) == (self.stop - self.start)):
+        if (background is not None) and (len(background) != (self.stop - self.start)):
             raise ValueError("Background length needs to match domain length")
 
         return Domain(
             spectrum=self.spectrum,
             start=self.start,
             stop=self.stop,
-            background=background)
+            background=background,
+            background_err=background_err,
+        )
 
     # ---------------------------
     # Array-like access

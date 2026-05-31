@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 import xarray as xr
+from uncertainties.unumpy import nominal_values, std_devs
 
 from pyspectrum.core.spectrum import Spectrum
 from pyspectrum.core.domain import Domain
@@ -123,4 +124,77 @@ def test_finding_peak_in_domain(simple_domain):
     positions, props = find_domain_peaks(simple_domain, smooth=True, prominence=AMP[1]/2)
     assert len(positions) == 1
     assert np.allclose(positions[0], CENTERS[1], CENTERS[1]*0.1)
+
+
+# -----------------------------------------------------------------------------
+# Background error propagation
+# -----------------------------------------------------------------------------
+
+@pytest.fixture
+def spectrum_with_errors():
+    counts = np.full(200, 100.0)
+    counts_err = np.full(200, 10.0)
+    return Spectrum(counts=counts, counts_err=counts_err)
+
+
+def test_subtract_background_with_err_returns_new_domain(spectrum_with_errors):
+    domain = Domain(spectrum_with_errors, start=50, stop=150)
+    bg = np.full(100, 20.0)
+    bg_err = np.full(100, 2.0)
+    sub = domain.subtract_background(bg, bg_err)
+    assert isinstance(sub, Domain)
+    assert sub.background_err is not None
+
+
+def test_background_err_length_mismatch_raises(spectrum_with_errors):
+    domain = Domain(spectrum_with_errors, start=50, stop=150)
+    bg = np.full(100, 20.0)
+    wrong_err = np.full(99, 2.0)
+    with pytest.raises(ValueError):
+        domain.subtract_background(bg, wrong_err)
+
+
+def test_background_err_without_background_raises(spectrum_with_errors):
+    domain = Domain(spectrum_with_errors, start=50, stop=150)
+    bg_err = np.full(100, 2.0)
+    with pytest.raises(ValueError):
+        domain.subtract_background(None, bg_err)
+
+
+def test_data_with_errors_propagates_background_uncertainty(spectrum_with_errors):
+    domain = Domain(spectrum_with_errors, start=50, stop=150)
+    bg = np.full(100, 20.0)
+    bg_err = np.full(100, 2.0)
+    sub = domain.subtract_background(bg, bg_err)
+
+    result = sub.data_with_errors
+    vals = nominal_values(result.values)
+    errs = std_devs(result.values)
+
+    # nominal: 100 - 20 = 80
+    assert np.allclose(vals, 80.0)
+    # error in quadrature: sqrt(10^2 + 2^2) = sqrt(104)
+    assert np.allclose(errs, np.sqrt(10**2 + 2**2))
+
+
+def test_data_with_errors_no_background_err_unchanged(spectrum_with_errors):
+    domain = Domain(spectrum_with_errors, start=50, stop=150)
+    bg = np.full(100, 20.0)
+    sub = domain.subtract_background(bg)
+
+    result = sub.data_with_errors
+    errs = std_devs(result.values)
+
+    # Only Poisson error — background has no uncertainty
+    assert np.allclose(errs, 10.0)
+
+
+def test_background_err_stored_as_separate_attribute(spectrum_with_errors):
+    domain = Domain(spectrum_with_errors, start=50, stop=150)
+    bg = np.full(100, 20.0)
+    bg_err = np.full(100, 2.0)
+    sub = domain.subtract_background(bg, bg_err)
+
+    assert np.allclose(sub.background, bg)
+    assert np.allclose(sub.background_err, bg_err)
 

@@ -105,7 +105,7 @@ class Spectrum:
             raise TypeError("resolution must be a ResolutionCalibration object")
         self.resolution_calib = resolution_calib
 
-    def domain(self, start_val: float, stop_val: float, background=None):
+    def domain(self, start_val: float, stop_val: float, background=None, background_err=None):
         """
         Create a Domain from physical axis values.
 
@@ -117,6 +117,8 @@ class Spectrum:
             Stop value in axis units.
         background : np.ndarray, optional
             Background to subtract from the domain.
+        background_err : np.ndarray, optional
+            1-sigma uncertainty of the background.
 
         Returns
         -------
@@ -137,7 +139,8 @@ class Spectrum:
             spectrum=self,
             start=int(indices[0]),
             stop=int(indices[-1] + 1),
-            background=background
+            background=background,
+            background_err=background_err,
         )
 
     @classmethod
