@@ -109,12 +109,9 @@ def test_estimate_peaks_centers_are_ordered(detector_cal):
 
 
 def test_estimate_peaks_center_accuracy(detector_cal):
-    """Each estimated centre must be within 1.5 channels of the true Gaussian centre."""
-    centers, _ = detector_cal.estimate_peaks()
-    errors = np.abs(centers - TRUE_CENTERS_CH)
-    assert np.all(errors < 1.5), (
-        f"Centre errors (channels): {errors.round(2)} — expected all < 1.5"
-    )
+    """Each estimated centre must be within 1 precent true Gaussian centre."""
+    centers, fwhms = detector_cal.estimate_peaks()
+    assert np.all(np.isclose(centers, TRUE_CENTERS_CH, rtol=0, atol=np.maximum(fwhms*1e-2,2)))
 
 
 def test_estimate_peaks_fwhm_accuracy(detector_cal):

@@ -1,29 +1,31 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
-import xarray as xr
-from pyspectrum.core.spectrum import Spectrum
+
 
 class BackgroundEstimator(ABC):
     """
     Abstract base class for background estimation algorithms.
+
+    All auxiliary inputs (resolution calibration, convolution objects, etc.)
+    must be passed at construction time, not to estimate().
     """
 
     @abstractmethod
-    def estimate(self, axis: np.ndarray, counts: np.ndarray, **kwargs) -> xr.DataArray:
+    def estimate(self, axis: np.ndarray, counts: np.ndarray) -> np.ndarray:
         """
         Estimate background for a 1D spectrum.
 
         Parameters
         ----------
         axis : np.ndarray
-        The axis along which to estimate the background.
+            Axis values (e.g. energy in keV).
         counts : np.ndarray
-        The counts of the spectrum along which to estimate the background.
+            Spectrum counts.
 
         Returns
         -------
-        background : DataArray
-            Estimated background.
+        np.ndarray
+            Estimated background, same shape as counts.
         """
         pass

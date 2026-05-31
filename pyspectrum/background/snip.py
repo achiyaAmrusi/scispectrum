@@ -1,5 +1,4 @@
 import numpy as np
-import xarray as xr
 from typing import Callable
 from pyspectrum.utils.smoothing import adaptive_gaussian_smoothing
 from pyspectrum.background.base import BackgroundEstimator
@@ -9,66 +8,58 @@ from .snip_utils import ll_transform, inv_ll_transform
 class SNIPBackground(BackgroundEstimator):
     """
     Classical SNIP background estimation (Ryan, 1988).
+
+    Parameters
+    ----------
+    iterations : int
+        Number of SNIP clipping iterations.
+    resolution : callable
+        Maps axis values to FWHM in the same units.
+        Required when smooth=True (the default).
+    smooth : bool
+        If True, apply resolution-adaptive Gaussian smoothing before SNIP.
+        Default is True.
     """
 
-    def __init__(self, iterations: int):
+    def __init__(self, iterations: int, resolution: Callable[[np.ndarray], np.ndarray] = None, smooth: bool = True):
         self.iterations = int(iterations)
+        self.resolution = resolution
+        self.smooth = smooth
 
-    def estimate(self, axis, counts, resolution: Callable[[np.ndarray], np.ndarray], smoothing=False) -> xr.DataArray:
+    def estimate(self, axis: np.ndarray, counts: np.ndarray) -> np.ndarray:
         """
-        Perform SNIP background estimation for a spectrum.
-        The spectrum is log-log smoothed before subtraction using the resolution calibration.
+        Estimate background using SNIP.
 
         Parameters
         ----------
-        spectrum : Spectrum
-
-        Returns
-        -------
-        bg : DataArray
-            Estimated background counts.
-        """
-        background =  self.sinp(axis, counts, resolution=resolution)
-
-        return background
-
-    def sinp(self, x: np.ndarray, y: np.ndarray, resolution: Callable[[np.ndarray], np.ndarray] = None, smooth=True) -> np.ndarray:
-        """
-        Perform SNIP background estimation on a 1D spectrum.
-
-        Parameters
-        ----------
-        x : array_like
+        axis : np.ndarray
             Axis values.
-        y : array_like
+        counts : np.ndarray
             Spectrum counts.
-        resolution : callable
-            Resolution(x) -> FWHM in axis units.
-        smooth : bool
-            If True, apply resolution-adaptive Gaussian smoothing before SNIP.
 
         Returns
         -------
-        bg : ndarray
-            Estimated background counts.
+        np.ndarray
+            Estimated background, same shape as counts.
         """
-        y = np.asarray(y, dtype=float)
-        z = ll_transform(y)
+        return self._sinp(axis, counts)
 
-        if smooth:
-            if resolution is None:
-                raise ValueError("Resolution callable must be provided for smoothing.")
-            z = adaptive_gaussian_smoothing(x, z, resolution=resolution)
+    def _sinp(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        if self.smooth:
+            if self.resolution is None:
+                raise ValueError("resolution must be provided at construction when smooth=True.")
+            y = np.asarray(y, dtype=float)
+            z = ll_transform(y)
+            z = adaptive_gaussian_smoothing(x, z, resolution=self.resolution)
+        else:
+            y = np.asarray(y, dtype=float)
+            z = ll_transform(y)
 
         n = len(z)
         for k in range(1, self.iterations + 1):
             z_new = z.copy()
             for i in range(k, n - k):
-                z_new[i] = min(
-                    z[i],
-                    0.5 * (z[i - k] + z[i + k]),
-                )
+                z_new[i] = min(z[i], 0.5 * (z[i - k] + z[i + k]))
             z = z_new
 
         return inv_ll_transform(z)
-

@@ -37,21 +37,21 @@ class ALSBackground(BackgroundEstimator):
         self.p = p
         self.max_iter = max_iter
 
-    def estimate(self, axis: np.ndarray, counts: np.ndarray, **kwargs) -> np.ndarray:
+    def estimate(self, axis: np.ndarray, counts: np.ndarray) -> np.ndarray:
         """
         Estimate the background of a spectrum using ALS.
 
         Parameters
         ----------
         axis : np.ndarray
-            Axis values (not used directly but required by the base interface).
+            Axis values (not used by ALS, required by the interface).
         counts : np.ndarray
-            Spectrum counts to estimate the background of.
+            Spectrum counts.
 
         Returns
         -------
-        z : np.ndarray
-            Estimated background, same shape as ``y``.
+        np.ndarray
+            Estimated background, same shape as counts.
         """
         y = counts
         n = len(y)
