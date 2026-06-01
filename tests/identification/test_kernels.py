@@ -4,6 +4,44 @@ import numpy as np
 import pytest
 
 from pyspectrum.identification.kernels.mexican_hat import gaussian_2_dev
+from pyspectrum.identification.kernels.base import Kernel1D
+
+
+# ---------------------------------------------------------------------------
+# Concrete subclass used only for testing the ABC helpers
+# ---------------------------------------------------------------------------
+
+class _GaussianKernel(Kernel1D):
+    """Minimal concrete kernel: unnormalised Gaussian."""
+    def values(self):
+        return np.exp(-0.5 * (self.x / self.sigma) ** 2)
+
+
+class TestKernel1D:
+
+    def test_half_width(self):
+        k = _GaussianKernel(sigma=2.0, support_sigma=3.0)
+        assert k.half_width == int(np.ceil(3.0 * 2.0))
+
+    def test_x_grid_length(self):
+        k = _GaussianKernel(sigma=2.0, support_sigma=3.0)
+        assert len(k.x) == 2 * k.half_width + 1
+
+    def test_x_grid_symmetric(self):
+        k = _GaussianKernel(sigma=2.0, support_sigma=3.0)
+        np.testing.assert_array_equal(k.x, -k.x[::-1])
+
+    def test_normalized_l1_norm(self):
+        k = _GaussianKernel(sigma=3.0)
+        v = k.normalized()
+        assert abs(np.sum(np.abs(v)) - 1.0) < 1e-10
+
+    def test_normalized_zero_kernel_unchanged(self):
+        class _ZeroKernel(Kernel1D):
+            def values(self):
+                return np.zeros_like(self.x, dtype=float)
+        k = _ZeroKernel(sigma=2.0)
+        np.testing.assert_array_equal(k.normalized(), np.zeros_like(k.x, dtype=float))
 
 
 class TestGaussian2Dev:
