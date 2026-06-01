@@ -55,6 +55,13 @@ def _erf_bg(axis):
     # Matches the single-peak erf model (weights=1)
     return TRUE_HEIGHT_DIFF * (scipy_erf(-(axis - TRUE_CENTER) / _SIGMA) + 1) / 2 + TRUE_BASELINE
 
+TRUE_BG_LEFT  = 80.0
+TRUE_BG_RIGHT = 20.0
+
+def _linear_bg(axis):
+    t = (axis - axis[0]) / (axis[-1] - axis[0])
+    return TRUE_BG_LEFT + (TRUE_BG_RIGHT - TRUE_BG_LEFT) * t
+
 def _res_calib():
     return ResolutionCalibration(
         lambda x: np.full_like(np.asarray(x, dtype=float), TRUE_FWHM)
@@ -77,6 +84,13 @@ def spectrum_plain():
 @pytest.fixture(scope="module")
 def spectrum_erf():
     counts = RNG.poisson(np.maximum(_gaussian(AXIS) + _erf_bg(AXIS), 0)).astype(float)
+    s = Spectrum(counts=counts, axis_calib=_axis_calib())
+    s.set_resolution_calibration(_res_calib())
+    return s
+
+@pytest.fixture(scope="module")
+def spectrum_linear():
+    counts = RNG.poisson(np.maximum(_gaussian(AXIS) + _linear_bg(AXIS), 0)).astype(float)
     s = Spectrum(counts=counts, axis_calib=_axis_calib())
     s.set_resolution_calibration(_res_calib())
     return s
@@ -279,9 +293,89 @@ class TestEdgeCases:
 
     def test_invalid_background_raises(self):
         with pytest.raises(ValueError, match="background must be"):
-            MultiGaussianFitter(background="linear")
+            MultiGaussianFitter(background="polynomial")
 
     def test_returns_false_for_empty_domain(self, fitter, spectrum_plain):
         # Far from the peak — counts are essentially 0, no peaks detected
         domain = spectrum_plain.domain(2.0, 15.0)
         assert fitter.fit(domain) is False
+
+# ---------------------------------------------------------------------------
+# Linear background mode
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def fitter_linear():
+    return MultiGaussianFitter(background="linear")
+
+@pytest.fixture(scope="module")
+def domain_linear(spectrum_linear):
+    return spectrum_linear.domain(DOMAIN_START, DOMAIN_STOP)
+
+@pytest.fixture(scope="module")
+def result_linear(fitter_linear, domain_linear):
+    r = fitter_linear.fit(domain_linear)
+    assert r is not False, "Linear fit should succeed on synthetic spectrum"
+    return r
+
+
+class TestLinearBackground:
+
+    def test_returns_dataset(self, result_linear):
+        assert isinstance(result_linear, xr.Dataset)
+
+    def test_background_attr(self, result_linear):
+        assert result_linear.attrs["background"] == "linear"
+
+    def test_has_background_variable(self, result_linear):
+        assert "background" in result_linear
+        assert list(result_linear["bg_quantity"].values) == ["bg_left", "bg_right"]
+
+    def test_covariance_size(self, result_linear):
+        n_peaks  = len(result_linear["i"])
+        n_params = 2 + 3 * n_peaks
+        assert result_linear["covariance"].shape == (n_params, n_params)
+
+    def test_param_coords_include_bg(self, result_linear):
+        coords = list(result_linear.coords["param"].values)
+        assert coords[0] == "bg_left"
+        assert coords[1] == "bg_right"
+
+    def test_center_accuracy(self, result_linear):
+        center = result_linear["params"].sel(quantity="center").values[0]
+        assert abs(center - TRUE_CENTER) < 0.5 * TRUE_FWHM
+
+    def test_fwhm_accuracy(self, result_linear):
+        fwhm = result_linear["params"].sel(quantity="fwhm").values[0]
+        assert abs(fwhm - TRUE_FWHM) / TRUE_FWHM < 0.2
+
+    def test_bg_left_accuracy(self, result_linear):
+        # Absolute tolerance: the domain peak (3000 cts) dominates, so bg parameters
+        # (80 and 20 cts) are loosely constrained — test within ±30 counts.
+        bg_left = result_linear["background"].sel(bg_quantity="bg_left").item()
+        assert abs(bg_left - TRUE_BG_LEFT) < 30
+
+    def test_bg_right_accuracy(self, result_linear):
+        bg_right = result_linear["background"].sel(bg_quantity="bg_right").item()
+        assert abs(bg_right - TRUE_BG_RIGHT) < 30
+
+    def test_evaluate_shape(self, fitter_linear, result_linear):
+        axis = np.linspace(DOMAIN_START, DOMAIN_STOP, 80)
+        assert fitter_linear.evaluate(axis, result_linear).shape == (80,)
+
+    def test_sample_structure(self, fitter_linear, result_linear):
+        samples = fitter_linear.sample(result_linear, size=20, rng=0)
+        assert "params" in samples and "background" in samples
+        assert samples["params"].dims    == ("sample", "i", "quantity")
+        assert samples["background"].dims == ("sample", "bg_quantity")
+
+    def test_sample_compatible_with_evaluate(self, fitter_linear, result_linear):
+        samples = fitter_linear.sample(result_linear, size=5, rng=0)
+        axis    = np.linspace(DOMAIN_START, DOMAIN_STOP, 40)
+        curve   = fitter_linear.evaluate(axis, samples.isel(sample=0))
+        assert curve.shape == (40,)
+
+    def test_sample_curves_shape(self, fitter_linear, result_linear):
+        axis   = np.linspace(DOMAIN_START, DOMAIN_STOP, 60)
+        curves = fitter_linear.sample_curves(axis, result_linear, size=100, rng=0)
+        assert curves.shape == (100, 60)
