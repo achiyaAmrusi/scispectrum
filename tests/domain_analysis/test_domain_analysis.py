@@ -34,7 +34,7 @@ CENTER       = 500
 AMP          = 500
 
 # Two-peak constants
-CENTERS_2    = (200, 700)
+CENTERS_2    = (300, 370)   # ~3 FWHM apart — close but clearly separable
 AMPS_2       = (300, 500)
 
 N_CHANNELS   = 1001
