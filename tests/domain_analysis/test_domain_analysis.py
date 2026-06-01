@@ -1,8 +1,9 @@
 """
 Tests for domain_analysis free functions.
 
-Synthetic setup: two Gaussian peaks on a flat background. The second peak
-(at CENTERS[1]) is isolated in its own Domain for single-peak tests.
+Two synthetic setups:
+  single_domain  — one Gaussian peak at CENTER, used for single-peak estimators
+  two_peak_domain — two well-separated peaks, used to verify multi-peak detection
 """
 
 import numpy as np
@@ -24,36 +25,66 @@ from pyspectrum.domain_analysis.background import domain_erf_background, domain_
 
 RNG = np.random.default_rng(7)
 
-BG        = 10
-AMP       = (100, 500)
-CENTERS   = (100, 500)
-SIGMA     = (10, 10)
-FWHM_TRUE = SIGMA[0] * 2 * np.sqrt(2 * np.log(2))
-DOMAIN_SIGMA = 4
+BG           = 10
+SIGMA        = 10
+FWHM_TRUE    = SIGMA * 2 * np.sqrt(2 * np.log(2))
+
+# Single-peak constants
+CENTER       = 500
+AMP          = 500
+
+# Two-peak constants
+CENTERS_2    = (200, 700)
+AMPS_2       = (300, 500)
+
+N_CHANNELS   = 1001
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _resolution_calib():
+    return ResolutionCalibration(lambda x: FWHM_TRUE)
+
+def _gaussian(channels, center, amp, sigma):
+    return amp * np.exp(-((channels - center) ** 2) / (2 * sigma ** 2))
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
-def simple_spectrum():
-    channels = np.arange(1001, dtype=float)
+def single_spectrum():
+    channels = np.arange(N_CHANNELS, dtype=float)
     counts   = np.full_like(channels, float(BG))
-    for c, a, s in zip(CENTERS, AMP, SIGMA):
-        counts += a * np.exp(-((channels - c) ** 2) / (2 * s ** 2))
-    counts = RNG.poisson(counts).astype(float)
+    counts  += _gaussian(channels, CENTER, AMP, SIGMA)
+    counts   = RNG.poisson(counts).astype(float)
     sp = Spectrum(counts=counts)
-    sp.set_resolution_calibration(ResolutionCalibration(lambda x: FWHM_TRUE))
+    sp.set_resolution_calibration(_resolution_calib())
     return sp
 
 @pytest.fixture(scope="module")
-def simple_domain(simple_spectrum):
-    center, sigma = CENTERS[1], SIGMA[1]
-    return Domain(
-        spectrum=simple_spectrum,
-        start=int(center - DOMAIN_SIGMA * sigma),
-        stop=int(center + DOMAIN_SIGMA * sigma),
-    )
+def two_peak_spectrum():
+    channels = np.arange(N_CHANNELS, dtype=float)
+    counts   = np.full_like(channels, float(BG))
+    for c, a in zip(CENTERS_2, AMPS_2):
+        counts += _gaussian(channels, c, a, SIGMA)
+    counts = RNG.poisson(counts).astype(float)
+    sp = Spectrum(counts=counts)
+    sp.set_resolution_calibration(_resolution_calib())
+    return sp
+
+@pytest.fixture(scope="module")
+def single_domain(single_spectrum):
+    half = 4 * SIGMA
+    return Domain(spectrum=single_spectrum,
+                  start=int(CENTER - half), stop=int(CENTER + half))
+
+@pytest.fixture(scope="module")
+def two_peak_domain(two_peak_spectrum):
+    start = int(min(CENTERS_2) - 4 * SIGMA)
+    stop  = int(max(CENTERS_2) + 4 * SIGMA)
+    return Domain(spectrum=two_peak_spectrum, start=start, stop=stop)
 
 # ---------------------------------------------------------------------------
 # find_domain_peaks
@@ -61,21 +92,34 @@ def simple_domain(simple_spectrum):
 
 class TestFindDomainPeaks:
 
-    def test_returns_two_values(self, simple_domain):
-        positions, props = find_domain_peaks(simple_domain, prominence=10)
+    def test_returns_positions_and_props(self, single_domain):
+        positions, props = find_domain_peaks(single_domain, prominence=10)
         assert positions is not None and props is not None
 
-    def test_detects_single_peak(self, simple_domain):
-        positions, _ = find_domain_peaks(simple_domain, prominence=10)
+    def test_single_peak_detected(self, single_domain):
+        positions, _ = find_domain_peaks(single_domain, prominence=10)
         assert len(positions) == 1
 
-    def test_peak_near_center(self, simple_domain):
-        positions, _ = find_domain_peaks(simple_domain, prominence=10)
-        assert abs(positions[0] - CENTERS[1]) < 2 * SIGMA[1]
+    def test_single_peak_near_center(self, single_domain):
+        positions, _ = find_domain_peaks(single_domain, prominence=10)
+        assert abs(positions[0] - CENTER) < 2 * SIGMA
 
-    def test_props_has_fwhm(self, simple_domain):
-        _, props = find_domain_peaks(simple_domain, prominence=10)
+    def test_two_peaks_detected(self, two_peak_domain):
+        positions, _ = find_domain_peaks(two_peak_domain, prominence=10)
+        assert len(positions) == 2
+
+    def test_two_peaks_near_true_centers(self, two_peak_domain):
+        positions, _ = find_domain_peaks(two_peak_domain, prominence=10)
+        for true_c in CENTERS_2:
+            assert any(abs(p - true_c) < 2 * SIGMA for p in positions)
+
+    def test_props_has_fwhm(self, single_domain):
+        _, props = find_domain_peaks(single_domain, prominence=10)
         assert "fwhm" in props
+
+    def test_fwhm_accurate(self, single_domain):
+        _, props = find_domain_peaks(single_domain, prominence=10)
+        assert abs(props["fwhm"][0] - FWHM_TRUE) / FWHM_TRUE < 0.3
 
 # ---------------------------------------------------------------------------
 # morphology helpers
@@ -83,34 +127,29 @@ class TestFindDomainPeaks:
 
 class TestMorphology:
 
-    def test_count_peaks(self, simple_domain):
-        assert domain_count_peaks(simple_domain, prominence=10) == 1
+    def test_count_single(self, single_domain):
+        assert domain_count_peaks(single_domain, prominence=10) == 1
 
-    def test_peaks_position_near_center(self, simple_domain):
-        pos = domain_peaks_position(simple_domain, prominence=10)
+    def test_count_two(self, two_peak_domain):
+        assert domain_count_peaks(two_peak_domain, prominence=10) == 2
+
+    def test_position_single(self, single_domain):
+        pos = domain_peaks_position(single_domain, prominence=10)
         assert len(pos) == 1
-        assert abs(pos[0] - CENTERS[1]) < 2 * SIGMA[1]
+        assert abs(pos[0] - CENTER) < 2 * SIGMA
 
-    def test_peaks_fwhm_returns_positive(self, simple_domain):
-        # domain_peaks_fwhm uses peak_widths on unsmoothed data with a smoothed
-        # peak index — accuracy is limited, but the result must be a positive scalar.
-        fwhm = domain_peaks_fwhm(simple_domain, prominence=10)
-        assert len(fwhm) == 1
-        assert fwhm[0] > 0
+    def test_position_two(self, two_peak_domain):
+        pos = domain_peaks_position(two_peak_domain, prominence=10)
+        assert len(pos) == 2
+        for true_c in CENTERS_2:
+            assert any(abs(p - true_c) < 2 * SIGMA for p in pos)
 
-    def test_find_domain_peaks_fwhm_accurate(self, simple_domain):
-        # The FWHM in find_domain_peaks properties is computed on smoothed data
-        # and is the reliable estimate.
-        _, props = find_domain_peaks(simple_domain, prominence=10)
-        assert abs(props["fwhm"][0] - FWHM_TRUE) / FWHM_TRUE < 0.3
+    def test_fwhm_length_matches_peak_count(self, two_peak_domain):
+        fwhm = domain_peaks_fwhm(two_peak_domain, prominence=10)
+        assert len(fwhm) == 2
 
-    def test_domain_bases_returns_two_floats(self, simple_domain):
-        left, right = domain_bases(simple_domain)
-        assert isinstance(left, float)
-        assert isinstance(right, float)
-
-    def test_domain_bases_near_background(self, simple_domain):
-        left, right = domain_bases(simple_domain)
+    def test_domain_bases_near_background(self, single_domain):
+        left, right = domain_bases(single_domain)
         assert abs(left  - BG) < 20
         assert abs(right - BG) < 20
 
@@ -120,12 +159,11 @@ class TestMorphology:
 
 class TestSinglePeakEstimators:
 
-    def test_center_within_sigma(self, simple_domain):
-        center = center_estimator(simple_domain)
-        assert abs(center - CENTERS[1]) < SIGMA[1]
+    def test_center_within_sigma(self, single_domain):
+        assert abs(center_estimator(single_domain) - CENTER) < SIGMA
 
-    def test_fwhm_within_tolerance(self, simple_domain):
-        fwhm = fwhm_estimator(simple_domain)
+    def test_fwhm_within_tolerance(self, single_domain):
+        fwhm = fwhm_estimator(single_domain)
         assert abs(fwhm - FWHM_TRUE) / FWHM_TRUE < 0.3
 
 # ---------------------------------------------------------------------------
@@ -134,24 +172,19 @@ class TestSinglePeakEstimators:
 
 class TestMoment:
 
-    def test_centroid_near_peak_center(self, simple_domain):
-        c = centroid(simple_domain)
-        assert abs(c - CENTERS[1]) < SIGMA[1]
+    def test_centroid_near_peak_center(self, single_domain):
+        assert abs(centroid(single_domain) - CENTER) < SIGMA
 
-    def test_variance_near_true_variance(self, simple_domain):
-        # Variance is sigma² — flat background dilutes it slightly, so test loosely
-        v = variance(simple_domain)
-        assert abs(v - SIGMA[1] ** 2) / SIGMA[1] ** 2 < 0.5
+    def test_variance_near_true_variance(self, single_domain):
+        v = variance(single_domain)
+        assert abs(v - SIGMA ** 2) / SIGMA ** 2 < 0.5
 
-    def test_skewness_near_zero(self, simple_domain):
-        # Symmetric Gaussian → skewness ≈ 0
-        s = skewness(simple_domain)
-        assert abs(s) < 1.0
+    def test_skewness_near_zero(self, single_domain):
+        assert abs(skewness(single_domain)) < 1.0
 
-    def test_centroid_empty_domain_returns_nan(self, simple_spectrum):
-        # Domain of all-zero counts → centroid is undefined
+    def test_centroid_empty_domain_returns_nan(self, single_spectrum):
         zero_domain = Domain(
-            spectrum=Spectrum(counts=np.zeros(len(simple_spectrum.counts))),
+            spectrum=Spectrum(counts=np.zeros(N_CHANNELS)),
             start=400, stop=600,
         )
         assert np.isnan(centroid(zero_domain))
@@ -162,25 +195,24 @@ class TestMoment:
 
 class TestDomainBackground:
 
-    def test_linear_output_shape(self, simple_domain):
-        bg = domain_linear_background(simple_domain)
-        assert bg.shape == (simple_domain.stop - simple_domain.start,)
+    def test_linear_shape(self, single_domain):
+        bg = domain_linear_background(single_domain)
+        assert bg.shape == (single_domain.stop - single_domain.start,)
 
-    def test_linear_endpoints_match_bases(self, simple_domain):
-        left, right = domain_bases(simple_domain)
-        bg = domain_linear_background(simple_domain)
+    def test_linear_endpoints_match_bases(self, single_domain):
+        left, right = domain_bases(single_domain)
+        bg = domain_linear_background(single_domain)
         assert abs(bg[0]  - left)  < 1.0
         assert abs(bg[-1] - right) < 1.0
 
-    def test_linear_is_monotone_or_flat(self, simple_domain):
-        # With symmetric flat background both edges ≈ BG, so slope ≈ 0
-        bg = domain_linear_background(simple_domain)
+    def test_linear_near_flat_for_flat_background(self, single_domain):
+        bg = domain_linear_background(single_domain)
         assert abs(bg[-1] - bg[0]) < 10
 
-    def test_erf_output_shape(self, simple_domain):
-        bg = domain_erf_background(simple_domain, prominence=10)
-        assert bg.shape == (simple_domain.stop - simple_domain.start,)
+    def test_erf_shape(self, single_domain):
+        bg = domain_erf_background(single_domain, prominence=10)
+        assert bg.shape == (single_domain.stop - single_domain.start,)
 
-    def test_erf_values_near_background_level(self, simple_domain):
-        bg = domain_erf_background(simple_domain, prominence=10)
+    def test_erf_values_near_background_level(self, single_domain):
+        bg = domain_erf_background(single_domain, prominence=10)
         assert np.all(np.abs(bg - BG) < 30)
