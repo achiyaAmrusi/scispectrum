@@ -298,7 +298,8 @@ class TestEdgeCases:
     def test_returns_false_for_empty_domain(self, fitter, spectrum_plain):
         # Far from the peak — counts are essentially 0, no peaks detected
         domain = spectrum_plain.domain(2.0, 15.0)
-        assert fitter.fit(domain) is False
+        with pytest.warns(UserWarning, match="No peaks detected"):
+            assert fitter.fit(domain) is False
 
 # ---------------------------------------------------------------------------
 # Linear background mode
