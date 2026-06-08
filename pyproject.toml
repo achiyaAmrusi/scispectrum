@@ -1,3 +1,36 @@
 [build-system]
 requires = ["setuptools>=74.1.0"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "scispectrum"
+version = "0.3.0"
+description = "1D detector spectrum analysis — energy calibration, background estimation, peak detection and fitting"
+authors = [
+    { name = "Achiya Yosef Amrusi", email = "ahia.amrosi@mail.huji.ac.il" }
+]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.11"
+keywords = ["gamma-ray spectroscopy", "peak fitting", "background estimation", "detector calibration", "nuclear physics"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "numpy>=2.0.0,<3.0",
+    "pandas>=2.3,<4.0",
+    "scipy>=1.14.0",
+    "xarray>=2024.6.0",
+    "uncertainties>=3.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/achiyaAmrusi/scispectrum"
+Repository = "https://github.com/achiyaAmrusi/scispectrum"
+Issues = "https://github.com/achiyaAmrusi/scispectrum/issues"
