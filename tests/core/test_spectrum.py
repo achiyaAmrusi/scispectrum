@@ -2,8 +2,8 @@ import numpy as np
 import xarray as xr
 import pytest
 
-from pyspectrum.core.spectrum import Spectrum
-from pyspectrum.calibration import ResolutionCalibration, AxisCalibration
+from scispectrum.core.spectrum import Spectrum
+from scispectrum.calibration import ResolutionCalibration, AxisCalibration
 
 BG =10
 AMP = (100, 500)

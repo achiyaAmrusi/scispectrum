@@ -2,7 +2,7 @@ import numpy as np
 import xarray as xr
 from typing import Optional
 from uncertainties.unumpy import uarray, nominal_values, std_devs
-from pyspectrum.calibration import AxisCalibration, ResolutionCalibration
+from scispectrum.calibration import AxisCalibration, ResolutionCalibration
 
 class Spectrum:
     """
@@ -124,7 +124,7 @@ class Spectrum:
         -------
         Domain
         """
-        from pyspectrum.core.domain import Domain  # lazy import to avoid circular dependency
+        from scispectrum.core.domain import Domain  # lazy import to avoid circular dependency
 
         axis = self.axis
         indices = np.where((axis >= start_val) & (axis <= stop_val))[0]

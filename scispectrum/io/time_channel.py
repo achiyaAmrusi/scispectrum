@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from pyspectrum.core import Spectrum
+from scispectrum.core import Spectrum
 from typing import Optional
-from pyspectrum.calibration import AxisCalibration, ResolutionCalibration
+from scispectrum.calibration import AxisCalibration, ResolutionCalibration
 
 class TimeChannelParser:
     """

@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.signal import peak_widths
-from pyspectrum.domain_analysis.find_peaks import find_domain_peaks
+from scispectrum.domain_analysis.find_peaks import find_domain_peaks
 
 def domain_count_peaks(domain, prominence=None, **kwargs):
     """

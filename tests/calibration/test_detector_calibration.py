@@ -18,12 +18,12 @@ can fit (dominant sqrt(E) term), so generate() has a clean convergence path.
 import numpy as np
 import pytest
 
-from pyspectrum.core import Spectrum
-from pyspectrum.calibration.axis import AxisCalibration
-from pyspectrum.calibration.resolution import ResolutionCalibration
-from pyspectrum.calibration.detector_calibration import DetectorCalibration
-from pyspectrum.calibration.models.energy_poly import PolynomialEnergyModel
-from pyspectrum.calibration.models.hpge_fwhm_model import StandardHPGeFWHMModel
+from scispectrum.core import Spectrum
+from scispectrum.calibration.axis import AxisCalibration
+from scispectrum.calibration.resolution import ResolutionCalibration
+from scispectrum.calibration.detector_calibration import DetectorCalibration
+from scispectrum.calibration.models.energy_poly import PolynomialEnergyModel
+from scispectrum.calibration.models.hpge_fwhm_model import StandardHPGeFWHMModel
 
 # ---------------------------------------------------------------------------
 # Ground truth constants

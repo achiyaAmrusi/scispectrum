@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pyspectrum.identification.convolution import Convolution
+from scispectrum.identification.convolution import Convolution
 
 FWHM = 10.0
 N    = 300

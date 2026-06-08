@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pyspectrum.core import Spectrum
-from pyspectrum.io import TimeChannelParser
+from scispectrum.core import Spectrum
+from scispectrum.io import TimeChannelParser
 
 N_CHANNELS = 256
 

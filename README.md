@@ -1,8 +1,8 @@
-# PySpectrum
+# scispectrum
 
 A Python package for 1D spectrum analysis, designed for physicists and scientists working with detector data such as gamma-ray, X-ray, or particle spectra.
 
-PySpectrum provides a clean, extensible framework for the full spectrum analysis pipeline — from raw detector output to calibrated, fitted, background-subtracted results — with proper uncertainty propagation throughout.
+scispectrum provides a clean, extensible framework for the full spectrum analysis pipeline — from raw detector output to calibrated, fitted, background-subtracted results — with proper uncertainty propagation throughout.
 
 ---
 
@@ -21,7 +21,7 @@ PySpectrum provides a clean, extensible framework for the full spectrum analysis
 
 ## Installation
 
-PySpectrum is not yet available on PyPI. Install directly from GitHub:
+scispectrum is not yet available on PyPI. Install directly from GitHub:
 
 ```bash
 git clone https://github.com/achiyaAmrusi/pySpectrum
@@ -38,7 +38,7 @@ This installs the package in editable mode, so any changes you make to the sourc
 
 ```python
 import pandas as pd
-from pyspectrum.core import Spectrum
+from scispectrum.core import Spectrum
 
 df = pd.read_csv("my_spectrum.csv")
 spectrum = Spectrum.from_dataframe(df, channel_col="channel", counts_col="counts")
@@ -47,7 +47,7 @@ spectrum = Spectrum.from_dataframe(df, channel_col="channel", counts_col="counts
 ### Apply an energy calibration
 
 ```python
-from pyspectrum.calibration import AxisCalibration
+from scispectrum.calibration import AxisCalibration
 
 # Linear calibration: energy = 0.5 * channel + 1.2
 calib = AxisCalibration(lambda ch: 0.5 * ch + 1.2, name="energy_keV")
@@ -64,7 +64,7 @@ domain = spectrum.domain(1460, 1480)
 ### Fit peaks
 
 ```python
-from pyspectrum.domain_fitting import SumOfGaussians
+from scispectrum.domain_fitting import SumOfGaussians
 
 result = SumOfGaussians.fit(domain)
 
@@ -76,7 +76,7 @@ print(result["amplitude"].values) # peak amplitudes
 ### Estimate and subtract background
 
 ```python
-from pyspectrum.background import ALSBackground
+from scispectrum.background import ALSBackground
 
 bg_estimator = ALSBackground(lam=1e5, p=0.001, max_iter=50)
 als_bg = bg_estimator.estimate(spectrum.axis, spectrum.counts)
@@ -86,7 +86,7 @@ domain_subtracted = domains.subtract_background(als_bg[domain.indices])
 ### Parse raw list-mode data
 
 ```python
-from pyspectrum.parsers import TimeChannelParser
+from scispectrum.parsers import TimeChannelParser
 
 # From a large file — processed in chunks to save memory
 spectrum = TimeChannelParser.from_file(
@@ -103,7 +103,7 @@ spectrum = TimeChannelParser.from_dataframe(df, axis_calib=calib)
 
 ## Uncertainty Propagation
 
-PySpectrum propagates measurement uncertainties through arithmetic operations using the `uncertainties` library. Poisson errors are assigned automatically when parsing list-mode data.
+scispectrum propagates measurement uncertainties through arithmetic operations using the `uncertainties` library. Poisson errors are assigned automatically when parsing list-mode data.
 
 ```python
 # Arithmetic preserves errors
@@ -113,14 +113,14 @@ subtraction.counts_err  # propagated uncertainties
 
 ---
 
-## Extending PySpectrum
+## Extending scispectrum
 
-PySpectrum is designed to be extended. Each analysis category has an abstract base class that defines the interface:
+scispectrum is designed to be extended. Each analysis category has an abstract base class that defines the interface:
 
 ### Custom fitting method
 
 ```python
-from pyspectrum.domain_fitting.abstract_fitting_class import PeakFit
+from scispectrum.domain_fitting.abstract_fitting_class import PeakFit
 
 class MyFitter(PeakFit):
     @classmethod
@@ -132,7 +132,7 @@ class MyFitter(PeakFit):
 ### Custom background estimator
 
 ```python
-from pyspectrum.background.base import BackgroundEstimator
+from scispectrum.background.base import BackgroundEstimator
 
 class MyBackground(BackgroundEstimator):
     def estimate(self, x, y):

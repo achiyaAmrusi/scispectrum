@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
-from pyspectrum.background.base import BackgroundEstimator
+from scispectrum.background.base import BackgroundEstimator
 
 
 class ALSBackground(BackgroundEstimator):

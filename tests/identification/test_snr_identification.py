@@ -3,11 +3,11 @@
 import numpy as np
 import pytest
 
-from pyspectrum.core import Spectrum
-from pyspectrum.core.domain import Domain
-from pyspectrum.calibration import ResolutionCalibration
-from pyspectrum.identification.convolution import Convolution
-from pyspectrum.identification.snr import SNRFinder
+from scispectrum.core import Spectrum
+from scispectrum.core.domain import Domain
+from scispectrum.calibration import ResolutionCalibration
+from scispectrum.identification.convolution import Convolution
+from scispectrum.identification.snr import SNRFinder
 
 # ---------------------------------------------------------------------------
 # Synthetic spectrum: two well-separated Gaussian peaks

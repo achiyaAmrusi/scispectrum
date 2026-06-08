@@ -1,13 +1,13 @@
 import numpy as np
 from typing import List, Tuple
 
-from pyspectrum.core.spectrum import Spectrum
-from pyspectrum.core.domain import Domain
-from pyspectrum.domain_analysis.single_peak import center_estimator, fwhm_estimator
-from pyspectrum.calibration.axis import AxisCalibration
-from pyspectrum.calibration.resolution import ResolutionCalibration
-from pyspectrum.calibration.models.energy_poly import PolynomialEnergyModel
-from pyspectrum.calibration.models.hpge_fwhm_model import StandardHPGeFWHMModel
+from scispectrum.core.spectrum import Spectrum
+from scispectrum.core.domain import Domain
+from scispectrum.domain_analysis.single_peak import center_estimator, fwhm_estimator
+from scispectrum.calibration.axis import AxisCalibration
+from scispectrum.calibration.resolution import ResolutionCalibration
+from scispectrum.calibration.models.energy_poly import PolynomialEnergyModel
+from scispectrum.calibration.models.hpge_fwhm_model import StandardHPGeFWHMModel
 
 class DetectorCalibration:
     """

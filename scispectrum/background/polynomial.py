@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Callable
-from pyspectrum.background.base import BackgroundEstimator
+from scispectrum.background.base import BackgroundEstimator
 
 
 class IterativePolyFit(BackgroundEstimator):

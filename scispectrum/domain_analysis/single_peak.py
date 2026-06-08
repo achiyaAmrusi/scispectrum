@@ -1,7 +1,7 @@
 import numpy as np
 from uncertainties.unumpy import nominal_values
 from uncertainties import nominal_value
-from pyspectrum.core import Domain
+from scispectrum.core import Domain
 import warnings
 
 def _interpolate_crossing(coords, data, i_low, i_high, threshold):

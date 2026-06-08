@@ -17,15 +17,15 @@ the true level) and IterativePolyFit can go negative at the edges.
 import numpy as np
 import pytest
 
-from pyspectrum.background import (
+from scispectrum.background import (
     ALSBackground,
     SNIPBackground,
     IterativePolyFit,
     IterativePolyFitWithMinimum,
     MinimaEnvelopeBackground,
 )
-from pyspectrum.calibration import ResolutionCalibration
-from pyspectrum.identification.convolution import Convolution
+from scispectrum.calibration import ResolutionCalibration
+from scispectrum.identification.convolution import Convolution
 
 # ---------------------------------------------------------------------------
 # Ground truth

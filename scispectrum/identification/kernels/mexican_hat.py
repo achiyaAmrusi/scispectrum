@@ -1,5 +1,5 @@
 import numpy as np
-from pyspectrum.utils.gaussian import fwhm_to_sigma
+from scispectrum.utils.gaussian import fwhm_to_sigma
 
 def gaussian_2_dev(x, mean, fwhm):
     """

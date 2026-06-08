@@ -3,10 +3,10 @@ import pytest
 import xarray as xr
 from uncertainties.unumpy import nominal_values, std_devs
 
-from pyspectrum.core.spectrum import Spectrum
-from pyspectrum.core.domain import Domain
-from pyspectrum.calibration import ResolutionCalibration
-from pyspectrum.domain_analysis.find_peaks import find_domain_peaks
+from scispectrum.core.spectrum import Spectrum
+from scispectrum.core.domain import Domain
+from scispectrum.calibration import ResolutionCalibration
+from scispectrum.domain_analysis.find_peaks import find_domain_peaks
 
 BG =10
 AMP = (100, 500)

@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from pyspectrum.calibration import ResolutionCalibration, AxisCalibration
+from scispectrum.calibration import ResolutionCalibration, AxisCalibration
 
 AXIS_FACTOR = 2
 

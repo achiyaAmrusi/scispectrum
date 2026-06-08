@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
-from pyspectrum.background.base import BackgroundEstimator
-from pyspectrum.calibration import ResolutionCalibration
+from scispectrum.background.base import BackgroundEstimator
+from scispectrum.calibration import ResolutionCalibration
 
 
 class MinimaEnvelopeBackground(BackgroundEstimator):

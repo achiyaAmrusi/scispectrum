@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Callable
-from pyspectrum.utils.smoothing import adaptive_gaussian_smoothing
-from pyspectrum.background.base import BackgroundEstimator
+from scispectrum.utils.smoothing import adaptive_gaussian_smoothing
+from scispectrum.background.base import BackgroundEstimator
 from .snip_utils import ll_transform, inv_ll_transform
 
 

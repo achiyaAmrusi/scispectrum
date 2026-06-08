@@ -1,6 +1,6 @@
 import numpy as np
-from pyspectrum.identification.kernels.mexican_hat import gaussian_2_dev
-from pyspectrum.utils.gaussian import GAUSSIAN_FWHM_TO_SIGMA
+from scispectrum.identification.kernels.mexican_hat import gaussian_2_dev
+from scispectrum.utils.gaussian import GAUSSIAN_FWHM_TO_SIGMA
 from typing import Callable
 
 class Convolution:

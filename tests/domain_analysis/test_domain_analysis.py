@@ -9,19 +9,19 @@ Two synthetic setups:
 import numpy as np
 import pytest
 
-from pyspectrum.core import Spectrum
-from pyspectrum.core.domain import Domain
-from pyspectrum.calibration import ResolutionCalibration
-from pyspectrum.domain_analysis.find_peaks import find_domain_peaks
-from pyspectrum.domain_analysis.morphology import (
+from scispectrum.core import Spectrum
+from scispectrum.core.domain import Domain
+from scispectrum.calibration import ResolutionCalibration
+from scispectrum.domain_analysis.find_peaks import find_domain_peaks
+from scispectrum.domain_analysis.morphology import (
     domain_count_peaks,
     domain_peaks_position,
     domain_peaks_fwhm,
     domain_bases,
 )
-from pyspectrum.domain_analysis.single_peak import center_estimator, fwhm_estimator
-from pyspectrum.domain_analysis.moment import centroid, variance, skewness
-from pyspectrum.domain_analysis.background import domain_erf_background, domain_linear_background
+from scispectrum.domain_analysis.single_peak import center_estimator, fwhm_estimator
+from scispectrum.domain_analysis.moment import centroid, variance, skewness
+from scispectrum.domain_analysis.background import domain_erf_background, domain_linear_background
 
 RNG = np.random.default_rng(7)
 

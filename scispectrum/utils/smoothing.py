@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
-from pyspectrum.utils.gaussian import fwhm_to_sigma
+from scispectrum.utils.gaussian import fwhm_to_sigma
 from typing import Callable
 
 def adaptive_gaussian_smoothing(

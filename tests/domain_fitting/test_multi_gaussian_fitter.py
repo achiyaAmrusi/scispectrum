@@ -20,10 +20,10 @@ import pytest
 import xarray as xr
 from scipy.special import erf as scipy_erf
 
-from pyspectrum.core import Spectrum
-from pyspectrum.calibration.axis import AxisCalibration
-from pyspectrum.calibration.resolution import ResolutionCalibration
-from pyspectrum.domain_fitting import MultiGaussianFitter
+from scispectrum.core import Spectrum
+from scispectrum.calibration.axis import AxisCalibration
+from scispectrum.calibration.resolution import ResolutionCalibration
+from scispectrum.domain_fitting import MultiGaussianFitter
 
 # ---------------------------------------------------------------------------
 # Ground truth

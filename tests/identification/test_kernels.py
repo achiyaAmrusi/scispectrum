@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from pyspectrum.identification.kernels.mexican_hat import gaussian_2_dev
-from pyspectrum.identification.kernels.base import Kernel1D
+from scispectrum.identification.kernels.mexican_hat import gaussian_2_dev
+from scispectrum.identification.kernels.base import Kernel1D
 
 
 # ---------------------------------------------------------------------------

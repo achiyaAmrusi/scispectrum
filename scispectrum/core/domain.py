@@ -3,7 +3,7 @@ import numpy as np
 import xarray as xr
 from uncertainties.unumpy import uarray
 
-from pyspectrum.core.spectrum import Spectrum
+from scispectrum.core.spectrum import Spectrum
 
 
 class Domain:

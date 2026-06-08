@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.signal import find_peaks, peak_widths, find_peaks_cwt
-from pyspectrum.utils.smoothing import gaussian_smoothing
+from scispectrum.utils.smoothing import gaussian_smoothing
 from copy import copy
 import numbers
 

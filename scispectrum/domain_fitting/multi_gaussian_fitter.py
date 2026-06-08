@@ -4,10 +4,10 @@ from scipy.optimize import curve_fit
 from scipy.special import erf as _scipy_erf
 import warnings
 
-from pyspectrum.core.domain import Domain
-from pyspectrum.domain_analysis.morphology import find_domain_peaks, domain_bases
-from pyspectrum.utils.gaussian import fwhm_to_sigma
-from pyspectrum.domain_fitting.abstract_fitting_class import MultiPeakFitter
+from scispectrum.core.domain import Domain
+from scispectrum.domain_analysis.morphology import find_domain_peaks, domain_bases
+from scispectrum.utils.gaussian import fwhm_to_sigma
+from scispectrum.domain_fitting.abstract_fitting_class import MultiPeakFitter
 
 
 class MultiGaussianFitter(MultiPeakFitter):

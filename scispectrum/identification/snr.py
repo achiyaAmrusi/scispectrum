@@ -1,7 +1,7 @@
 # indentification/snr.py
 import numpy as np
-from pyspectrum.identification.base import DomainFinder
-from pyspectrum.core.domain import Domain
+from scispectrum.identification.base import DomainFinder
+from scispectrum.core.domain import Domain
 
 
 class SNRFinder(DomainFinder):

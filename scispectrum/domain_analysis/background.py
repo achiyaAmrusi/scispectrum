@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.special import erf
-from pyspectrum.core.domain import Domain
-from pyspectrum.domain_analysis.morphology import find_domain_peaks, domain_bases
+from scispectrum.core.domain import Domain
+from scispectrum.domain_analysis.morphology import find_domain_peaks, domain_bases
 
 def domain_erf_background(domain: Domain,
                           smooth=True,
