@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scispectrum"
-version = "0.3.0"
+version = "0.3.1"
 description = "1D detector spectrum analysis — energy calibration, background estimation, peak detection and fitting"
 authors = [
     { name = "Achiya Yosef Amrusi", email = "ahia.amrosi@mail.huji.ac.il" }
