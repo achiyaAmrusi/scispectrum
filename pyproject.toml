@@ -30,6 +30,9 @@ dependencies = [
     "uncertainties>=3.1",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest"]
+
 [project.urls]
 Homepage = "https://github.com/achiyaAmrusi/scispectrum"
 Repository = "https://github.com/achiyaAmrusi/scispectrum"
