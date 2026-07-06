@@ -123,6 +123,59 @@ def test_estimate_peaks_fwhm_accuracy(detector_cal):
     )
 
 
+def test_estimate_peaks_tracks_spectrums_current_axis_units(synthetic_spectrum, generated):
+    """estimate_peaks() intentionally reports in whatever axis units
+    self.spectrum currently has: channels before calibration, and the
+    calibrated axis afterwards (since self.spectrum is held by reference).
+    This lets a second call after set_axis_calibration() re-measure peak
+    positions directly in calibrated units, independent of the fitted
+    calibration function — exactly how the calibration.ipynb example verifies
+    its fit."""
+    # Use a fresh spectrum so this test doesn't mutate the module-scoped fixture
+    fresh = Spectrum(counts=synthetic_spectrum.counts.copy())
+    detector_cal = DetectorCalibration(
+        spectrum=fresh,
+        known_axis_values=TRUE_ENERGIES.tolist(),
+        peak_domains=PEAK_DOMAINS,
+        energy_model=PolynomialEnergyModel(degree=1),
+        fwhm_model=StandardHPGeFWHMModel(),
+    )
+    centers_ch, _ = detector_cal.estimate_peaks()
+    np.testing.assert_allclose(centers_ch, TRUE_CENTERS_CH, atol=2.0)
+
+    axis_calib, res_calib = generated
+    fresh.set_axis_calibration(axis_calib)
+    fresh.set_resolution_calibration(res_calib)
+
+    centers_energy, _ = detector_cal.estimate_peaks()
+    np.testing.assert_allclose(centers_energy, TRUE_ENERGIES, atol=1.0)
+
+
+def test_generate_unaffected_by_preexisting_spectrum_calibration(synthetic_spectrum):
+    """generate() must fit the same channel->energy calibration whether or
+    not the spectrum it's given already has some (unrelated) axis calibration
+    attached — this is what broke domain_fitting.ipynb: building the Spectrum
+    with a calibration already applied before DetectorCalibration.generate()
+    silently fit calibrated-axis values against themselves instead of against
+    raw channels."""
+    precalibrated = Spectrum(
+        counts=synthetic_spectrum.counts.copy(),
+        axis_calib=AxisCalibration(lambda ch: 2.0 * ch + 5.0, name="bogus"),
+    )
+    detector_cal = DetectorCalibration(
+        spectrum=precalibrated,
+        known_axis_values=TRUE_ENERGIES.tolist(),
+        peak_domains=PEAK_DOMAINS,
+        energy_model=PolynomialEnergyModel(degree=1),
+        fwhm_model=StandardHPGeFWHMModel(),
+    )
+    axis_calib, _ = detector_cal.generate()
+    recovered = axis_calib.apply(TRUE_CENTERS_CH)
+    assert np.all(np.abs(recovered - TRUE_ENERGIES) < 1.0), (
+        f"Energy errors (keV): {np.abs(recovered - TRUE_ENERGIES).round(3)} — expected all < 1.0 keV"
+    )
+
+
 # ---------------------------------------------------------------------------
 # generate() tests
 # ---------------------------------------------------------------------------

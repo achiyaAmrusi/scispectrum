@@ -49,7 +49,11 @@ class DetectorCalibration:
         ----------
         spectrum : Spectrum
             Measured spectrum containing the calibration peaks.
-            The spectrum is assumed to be indexed in detector channels.
+            `generate()` always characterizes peaks in channel units
+            internally, regardless of any axis calibration already
+            attached to this spectrum. `estimate_peaks()`, on the other
+            hand, reports in whatever axis units the spectrum currently
+            has — see its docstring.
 
         known_axis_values : list of float
             Known physical axis values corresponding to each peak domain.
@@ -79,24 +83,53 @@ class DetectorCalibration:
         """
         Estimate peak centroids and widths from the provided peak domains.
 
-        Each peak domain is sliced from the spectrum and analyzed using
-        a model-independent estimator to obtain:
-        - the peak center (in channel units)
-        - the peak FWHM (in channel units)
+        Each peak domain is sliced from `self.spectrum` and analyzed using
+        a model-independent estimator to obtain the peak center and FWHM,
+        reported in whatever axis units `self.spectrum` currently has
+        (channels, if no calibration has been set on it yet; the calibrated
+        axis otherwise — since `self.spectrum` is held by reference, calling
+        this again after `spectrum.set_axis_calibration(...)` reports in the
+        newly calibrated units). This lets the same peak domains be
+        re-measured directly in calibrated units for verification, without
+        going through the fitted calibration function.
+
+        Use this to verify a calibration already applied to the spectrum;
+        `generate()` (below) always characterizes peaks in raw channel units
+        internally, so it isn't affected by the spectrum's calibration state.
 
         Returns
         -------
         centers : ndarray
-            Estimated peak centroids in detector channels.
+            Estimated peak centroids, in the spectrum's current axis units.
 
         fwhms : ndarray
-            Estimated peak full widths at half maximum in channels.
+            Estimated peak full widths at half maximum, in the same units.
         """
         centers = []
         fwhms = []
 
         for lo, hi in self.peak_domains:
             domain = Domain(self.spectrum, start=lo, stop=hi)
+            c = center_estimator(domain)
+            f = fwhm_estimator(domain)
+            centers.append(float(c))
+            fwhms.append(float(f))
+
+        return np.asarray(centers), np.asarray(fwhms)
+
+    def _estimate_peaks_channels(self):
+        """Like `estimate_peaks`, but always in raw channel units, regardless
+        of any axis calibration already attached to `self.spectrum`. Used by
+        `generate()` so axis-calibration fitting can never be contaminated by
+        a spectrum that was calibrated before (or during) this object's
+        lifetime."""
+        channel_spectrum = Spectrum(counts=self.spectrum.counts, counts_err=self.spectrum.counts_err)
+
+        centers = []
+        fwhms = []
+
+        for lo, hi in self.peak_domains:
+            domain = Domain(channel_spectrum, start=lo, stop=hi)
             c = center_estimator(domain)
             f = fwhm_estimator(domain)
             centers.append(float(c))
@@ -132,7 +165,7 @@ class DetectorCalibration:
             Callable calibration describing detector resolution
             (FWHM) as a function of the calibrated axis.
         """
-        centers_ch, fwhm_ch = self.estimate_peaks()
+        centers_ch, fwhm_ch = self._estimate_peaks_channels()
 
         # --- Energy calibration ---
         e_params, _ = self.energy_model.fit(
