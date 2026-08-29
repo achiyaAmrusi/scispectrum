@@ -91,6 +91,7 @@ class Spectrum:
             f"{zeros.sum()} of {zeros.size} entries in counts_err are zero. "
             f"They are replaced by 1."
         )
+        # np.array copies; asarray would alias and write 1.0 into the caller's array
         counts_err = np.array(counts_err, dtype=float)
         counts_err[zeros] = 1.0
         return counts_err
