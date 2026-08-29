@@ -101,3 +101,16 @@ class TestFromDataframe:
         s = TimeChannelParser.from_dataframe(df, num_of_channels=N_CHANNELS)
         assert s.counts_err is not None
         assert s.counts_err[5] == pytest.approx(np.sqrt(2))
+
+    def test_counts_err_floored_at_one(self, recwarn):
+        """Most channels of a parsed spectrum are empty, and sqrt(0) is 0.
+
+        A zero uncertainty claims a channel is known exactly and divides by
+        zero wherever the errors weight a fit, so the parser floors them here
+        rather than leaving Spectrum to substitute and warn.
+        """
+        df = _make_df(np.array([5, 5, 10]))
+        s = TimeChannelParser.from_dataframe(df, num_of_channels=N_CHANNELS)
+        assert (s.counts == 0).any()
+        assert np.all(s.counts_err >= 1.0)
+        assert len(recwarn) == 0

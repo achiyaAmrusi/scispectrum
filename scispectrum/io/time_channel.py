@@ -107,7 +107,9 @@ class TimeChannelParser:
         spectrum_df = pd.DataFrame({
             "channel": np.arange(num_of_channels),
             "counts": counts,
-            "counts_error": np.sqrt(counts)
+            # floored at 1: an empty channel is not known exactly, and a zero
+            # uncertainty divides by zero wherever the errors weight a fit
+            "counts_error": np.maximum(np.sqrt(counts), 1.0)
         })
 
         return Spectrum.from_dataframe(
@@ -161,7 +163,9 @@ class TimeChannelParser:
         spectrum_df = pd.DataFrame({
             "channel": np.arange(num_of_channels),
             "counts": counts,
-            "counts_error": np.sqrt(counts)
+            # floored at 1: an empty channel is not known exactly, and a zero
+            # uncertainty divides by zero wherever the errors weight a fit
+            "counts_error": np.maximum(np.sqrt(counts), 1.0)
         })
 
         return Spectrum.from_dataframe(

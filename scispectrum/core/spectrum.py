@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 import xarray as xr
 from typing import Optional
@@ -12,6 +13,9 @@ class Spectrum:
     ----------
     counts : np.ndarray
         1D array of measured counts.
+    counts_err : np.ndarray, optional
+        Per-channel uncertainty on "counts", same shape. Zero entries are
+        replaced by 1 with a warning.
     axis_calib : AxisCalibration, optional
         Axis calibration mapping channels -> physical values.
     resolution_calib : ResolutionCalibration, optional
@@ -52,7 +56,7 @@ class Spectrum:
         if counts_err is not None:
             if not (isinstance(counts_err, np.ndarray) and counts_err.shape == counts.shape):
                 raise TypeError("counts error must have the same shape as counts")
-            self.counts_err = counts_err
+            self.counts_err = self._replace_zero_errors(counts_err)
         else:
             self.counts_err = None
 
@@ -75,6 +79,21 @@ class Spectrum:
     # ------------------------------------------------------------------
     # Core interface
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _replace_zero_errors(counts_err: np.ndarray) -> np.ndarray:
+        """Replace zero uncertainties by 1, warning that it was done."""
+        zeros = counts_err == 0
+        if not zeros.any():
+            return counts_err
+
+        warnings.warn(
+            f"{zeros.sum()} of {zeros.size} entries in counts_err are zero. "
+            f"They are replaced by 1."
+        )
+        counts_err = np.array(counts_err, dtype=float)
+        counts_err[zeros] = 1.0
+        return counts_err
 
     @property
     def data(self) -> xr.DataArray:
