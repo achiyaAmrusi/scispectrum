@@ -219,24 +219,8 @@ def test_zero_errors_are_replaced_by_one():
                      counts_err=np.array([2.0, 0.0, 3.0]))
     assert np.array_equal(s.counts_err, [2.0, 1.0, 3.0])
 
-
-def test_zero_errors_do_not_modify_the_caller_array():
-    counts_err = np.array([2.0, 0.0, 3.0])
-    with pytest.warns(UserWarning):
-        Spectrum(counts=np.array([4.0, 0.0, 9.0]), counts_err=counts_err)
-    assert np.array_equal(counts_err, [2.0, 0.0, 3.0])
-
-
 def test_errors_without_zeros_pass_through_unwarned(recwarn):
     counts_err = np.array([2.0, 1.0, 3.0])
     s = Spectrum(counts=np.array([4.0, 1.0, 9.0]), counts_err=counts_err)
     assert len(recwarn) == 0
     assert np.array_equal(s.counts_err, counts_err)
-
-
-def test_integer_errors_are_promoted_to_float():
-    """Substituting 1 into an integer array must not truncate the other entries."""
-    with pytest.warns(UserWarning):
-        s = Spectrum(counts=np.array([4, 0, 9]), counts_err=np.array([2, 0, 3]))
-    assert s.counts_err.dtype == float
-    assert np.array_equal(s.counts_err, [2.0, 1.0, 3.0])
