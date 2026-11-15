@@ -1,5 +1,6 @@
 from typing import Callable
 import numpy as np
+from copy import deepcopy
 
 class AxisCalibration:
     """
@@ -58,3 +59,15 @@ class AxisCalibration:
         channels = np.arange(len(axis))
         func = lambda ch: np.interp(ch, channels, axis)
         return cls(func=func, name=name)
+
+    # ---------------------------
+    # copy properties
+    # ---------------------------
+
+    def __copy__(self):
+        return AxisCalibration(self.func, self.name)
+
+    def __deepcopy__(self, memo):
+        new_instance = AxisCalibration(self.func, self.name)
+        memo[id(self)] = new_instance
+        return new_instance

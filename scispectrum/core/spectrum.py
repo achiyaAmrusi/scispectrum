@@ -4,6 +4,7 @@ import xarray as xr
 from typing import Optional
 from uncertainties.unumpy import uarray, nominal_values, std_devs
 from scispectrum.calibration import AxisCalibration, ResolutionCalibration
+from copy import deepcopy
 
 class Spectrum:
     """
@@ -244,6 +245,8 @@ class Spectrum:
 
     def __getattr__(self, name):
         """Delegate attribute access to xarray DataArray."""
+        if name.startswith("_"):
+            raise AttributeError(name)
         return getattr(self.data, name)
 
     def __getitem__(self, key):
@@ -300,3 +303,24 @@ class Spectrum:
     def __mul__(self, other): return self._apply_operation(other, lambda x, y: x * y)
     def __truediv__(self, other): return self._apply_operation(other, lambda x, y: x / y)
     def __pow__(self, other): return self._apply_operation(other, lambda x, y: x ** y)
+
+    # ---------------------------
+    # copy properties
+    # ---------------------------
+
+    def __copy__(self):
+        return Spectrum(counts=self.counts,
+                        counts_err=self.counts_err,
+                        axis_calib=self.axis_calib,
+                        resolution_calib=self.resolution_calib,
+                        metadata=self.metadata)
+
+    def __deepcopy__(self, memo):
+        new_instance = Spectrum(counts=deepcopy(self.counts, memo),
+                        counts_err=deepcopy(self.counts_err, memo),
+                        axis_calib=deepcopy(self.axis_calib, memo),
+                        resolution_calib=deepcopy(self.resolution_calib, memo),
+                        metadata=deepcopy(self.metadata, memo))
+        memo[id(self)] = new_instance
+        return new_instance
+    
