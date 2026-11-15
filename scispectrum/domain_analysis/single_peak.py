@@ -118,20 +118,33 @@ def fwhm_estimator(single_peak_domain: Domain):
     return right_edge - left_edge
 
 def sum_under(single_peak_domain: Domain, left_edge: float, right_edge: float):
-    """Sum counts between left_edge and right_edge, including fractional edge channels."""
+    """Sum counts between left_edge and right_edge:
+        integral over channels of the linearly interpolated counts, from left_edge to right_edge
+    (trapezoid rule over the edges and the coords strictly between them).
+
+    The edges are given in axis units and converted to fractional channels, each
+    within its own interval, so the result is in counts for any axis calibration.
+    Which coords are interior is chosen from the nominal edges; the edges themselves
+    enter the arithmetic, so if they are ufloats their uncertainty (the window's)
+    propagates into the sum.
+    """
     data   = _get_data(single_peak_domain)
     coords = data.coords[single_peak_domain.spectrum.axis_name].values
-    daxis  = coords[1] - coords[0]
+    values = data.values
 
-    fwhm_mask    = (coords > left_edge) & (coords < right_edge)
-    interior_sum = data[fwhm_mask].sum()
+    # interior coords are coords[first:last + 1]; each edge lies between an interior
+    # coord and its outer neighbour, and is interpolated between those two
+    first = np.searchsorted(coords, nominal_value(left_edge), side="right")
+    last  = np.searchsorted(coords, nominal_value(right_edge), side="left") - 1
 
-    left_channel   = data[(coords >= left_edge)][0]
-    right_channel  = data[(coords <= right_edge)][-1]
-    left_fraction  = (coords[np.where(coords >= left_edge)[0][0]]  - left_edge)  / daxis
-    right_fraction = (right_edge - coords[np.where(coords <= right_edge)[0][-1]]) / daxis
+    left_frac  = (left_edge - coords[first - 1]) / (coords[first] - coords[first - 1])
+    right_frac = (right_edge - coords[last]) / (coords[last + 1] - coords[last])
+    left_value  = values[first - 1] + left_frac * (values[first] - values[first - 1])
+    right_value = values[last] + right_frac * (values[last + 1] - values[last])
 
-    return (interior_sum + left_fraction * left_channel + right_fraction * right_channel).item()
+    channels = np.array([first - 1 + left_frac, *range(first, last + 1), last + right_frac])
+    counts   = np.array([left_value, *values[first:last + 1], right_value])
+    return np.trapezoid(counts, channels)
 
 
 def sum_under_fwhm(single_peak_domain: Domain):

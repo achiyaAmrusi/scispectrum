@@ -301,3 +301,62 @@ def test_right_base_uses_last_channels(single_domain):
     n = _base_width(single_domain)
     assert domain_bases(single_domain)[1] == pytest.approx(single_domain.data.values[-n:].mean())
 
+
+# ---------------------------------------------------------------------------
+# sum_under: (1/dx) * integral of the linearly interpolated counts from a to b
+# ---------------------------------------------------------------------------
+
+from uncertainties import nominal_value, std_dev
+from scispectrum.calibration import AxisCalibration
+from scispectrum.domain_analysis.single_peak import sum_under, sum_under_fwhm
+
+
+def _flat_domain(slope=1.0):
+    spectrum = Spectrum(counts=np.ones(40), axis_calib=AxisCalibration(lambda ch: slope * ch))
+    return Domain(spectrum, 0, 40)
+
+
+@pytest.mark.parametrize("a, b", [(10.3, 20.6), (10.0, 20.0), (10.9, 20.1), (10.2, 10.7)])
+def test_sum_under_flat_equals_width(a, b):
+    """Edges between coords, on coords, and both inside one interval."""
+    assert np.isclose(sum_under(_flat_domain(), a, b), b - a)
+
+
+def test_sum_under_flat_scaled_axis():
+    """Width is measured in channels: on an axis of 0.5/channel, 5 axis units = 10 channels."""
+    assert np.isclose(sum_under(_flat_domain(slope=0.5), 5.0, 10.0), 10.0)
+
+
+def test_sum_under_linear_counts_is_exact():
+    """The trapezoid rule is exact for linear counts: sum = (b^2 - a^2) / 2."""
+    domain = Domain(Spectrum(counts=np.arange(40, dtype=float)), 0, 40)
+    a, b = 10.3, 20.6
+    assert np.isclose(sum_under(domain, a, b), (b**2 - a**2) / 2)
+
+
+def test_sum_under_fwhm_gaussian(single_domain):
+    """A Gaussian holds erf(sqrt(ln 2)) = 76.1 % of its area within the FWHM."""
+    from scipy.special import erf
+    expected = AMP * SIGMA * np.sqrt(2 * np.pi) * erf(np.sqrt(np.log(2))) + BG * FWHM_TRUE
+    assert np.isclose(sum_under_fwhm(single_domain), expected, rtol=0.03)
+
+
+def test_sum_under_with_errors_matches_plain():
+    counts = np.random.default_rng(3).poisson(100, 40).astype(float)
+    plain = Domain(Spectrum(counts=counts), 0, 40)
+    with_err = Domain(Spectrum(counts=counts, counts_err=np.sqrt(counts)), 0, 40)
+    s = sum_under(with_err, 10.3, 20.6)
+    assert np.isclose(nominal_value(s), sum_under(plain, 10.3, 20.6))
+    assert std_dev(s) > 0
+
+
+def test_sum_under_flat_nonlinear_axis():
+    """On a quadratic axis the edges map back to fractional channels within their own
+    interval, so a flat spectrum sums to the channel width, not axis width / dx."""
+    spectrum = Spectrum(counts=np.ones(40), axis_calib=AxisCalibration(lambda ch: 0.01 * ch**2 + ch))
+    domain = Domain(spectrum, 0, 40)
+    axis = spectrum.axis
+    a = axis[10] + 0.3 * (axis[11] - axis[10])     # channel 10.3
+    b = axis[20] + 0.6 * (axis[21] - axis[20])     # channel 20.6
+    assert np.isclose(sum_under(domain, a, b), 10.3)
+
