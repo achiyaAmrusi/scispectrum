@@ -25,7 +25,8 @@ class BaseCalibrationModel(ABC):
             return self.function(np.asarray(x), *params)
         return f
 
-    def fit(self, x: np.ndarray, y: np.ndarray, p0=None):
-        """Fit parameters to data."""
-        params, cov = curve_fit(self.function, x, y, p0=p0)
+    def fit(self, x: np.ndarray, y: np.ndarray, p0=None, sigma=None):
+        """Fit parameters to data. `sigma` is the absolute 1-sigma error on y."""
+        params, cov = curve_fit(self.function, x, y, p0=p0, sigma=sigma,
+                                absolute_sigma=sigma is not None)
         return params, cov

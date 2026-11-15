@@ -1,4 +1,5 @@
 import numpy as np
+from uncertainties.unumpy import nominal_values, std_devs
 from typing import List, Tuple
 
 from scispectrum.core.spectrum import Spectrum
@@ -101,9 +102,11 @@ class DetectorCalibration:
         -------
         centers : ndarray
             Estimated peak centroids, in the spectrum's current axis units.
+            Array of ufloats if the spectrum has `counts_err`, else floats.
 
         fwhms : ndarray
             Estimated peak full widths at half maximum, in the same units.
+            Array of ufloats if the estimator returns them, else floats.
         """
         centers = []
         fwhms = []
@@ -112,8 +115,8 @@ class DetectorCalibration:
             domain = Domain(self.spectrum, start=lo, stop=hi)
             c = center_estimator(domain)
             f = fwhm_estimator(domain)
-            centers.append(float(c))
-            fwhms.append(float(f))
+            centers.append(c)
+            fwhms.append(f)
 
         return np.asarray(centers), np.asarray(fwhms)
 
@@ -132,8 +135,8 @@ class DetectorCalibration:
             domain = Domain(channel_spectrum, start=lo, stop=hi)
             c = center_estimator(domain)
             f = fwhm_estimator(domain)
-            centers.append(float(c))
-            fwhms.append(float(f))
+            centers.append(c)
+            fwhms.append(f)
 
         return np.asarray(centers), np.asarray(fwhms)
 
@@ -165,13 +168,24 @@ class DetectorCalibration:
             Callable calibration describing detector resolution
             (FWHM) as a function of the calibrated axis.
         """
-        centers_ch, fwhm_ch = self._estimate_peaks_channels()
+        centers, fwhms = self._estimate_peaks_channels()
+        centers_ch, centers_err = nominal_values(centers), std_devs(centers)
+        fwhm_ch, fwhm_err = nominal_values(fwhms), std_devs(fwhms)
 
         # --- Energy calibration ---
+        # The error is on x (channel); curve_fit weights y, so the centre error is
+        # carried over through the slope (effective variance): sigma_E = |dE/dch| * sigma_ch.
         e_params, _ = self.energy_model.fit(
             x=centers_ch,
             y=self.known_axis,
             p0=energy_p0)
+        if np.all(centers_err > 0):
+            slope = _slope(self.energy_model.generator(e_params), centers_ch)
+            e_params, _ = self.energy_model.fit(
+                x=centers_ch,
+                y=self.known_axis,
+                p0=e_params,
+                sigma=np.abs(slope) * centers_err)
         energy_func = self.energy_model.generator(e_params)
         axis_calib = AxisCalibration(energy_func, name="energy")
 
@@ -181,11 +195,18 @@ class DetectorCalibration:
             axis_calib.apply(centers_ch + fwhm_ch / 2)
             - axis_calib.apply(centers_ch - fwhm_ch / 2)
         )
+        fwhm_axis_err = np.abs(_slope(energy_func, centers_ch)) * fwhm_err
 
         # --- Resolution calibration ---
-        r_params, _ = self.fwhm_model.fit(axis, fwhm_axis, p0=fwhm_p0)
+        r_params, _ = self.fwhm_model.fit(
+            axis, fwhm_axis, p0=fwhm_p0,
+            sigma=fwhm_axis_err if np.all(fwhm_axis_err > 0) else None)
         res_func = self.fwhm_model.generator(r_params)
         resolution_calib = ResolutionCalibration(res_func)
 
         return axis_calib, resolution_calib
 
+
+def _slope(func, x, h=1e-3):
+    """Numerical derivative of a calibration function at x (central difference)."""
+    return (func(x + h) - func(x - h)) / (2 * h)

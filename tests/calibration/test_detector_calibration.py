@@ -224,3 +224,63 @@ def test_generate_calibrations_attachable_to_spectrum(synthetic_spectrum, genera
     fresh.set_resolution_calibration(res_calib)
     assert fresh.axis_calib     is axis_calib
     assert fresh.resolution_calib is res_calib
+
+
+# ---------------------------------------------------------------------------
+# Spectrum with counts_err: peak estimates carry uncertainties
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def detector_cal_with_errors(synthetic_spectrum):
+    counts = synthetic_spectrum.counts
+    return DetectorCalibration(
+        spectrum=Spectrum(counts=counts.copy(), counts_err=np.sqrt(counts)),
+        known_axis_values=TRUE_ENERGIES.tolist(),
+        peak_domains=PEAK_DOMAINS,
+        energy_model=PolynomialEnergyModel(degree=1),
+        fwhm_model=StandardHPGeFWHMModel(),
+    )
+
+
+def test_estimate_peaks_with_errors_returns_ufloat_centers(detector_cal_with_errors):
+    """With counts_err, centres come back as ufloats with a positive std."""
+    from uncertainties.unumpy import nominal_values, std_devs
+    centers, fwhms = detector_cal_with_errors.estimate_peaks()
+    assert len(centers) == len(TRUE_CENTERS_CH)
+    assert np.all(std_devs(centers) > 0)
+    np.testing.assert_allclose(nominal_values(centers), TRUE_CENTERS_CH, atol=2.0)
+    np.testing.assert_allclose(nominal_values(fwhms), TRUE_FWHM_CH, rtol=0.15)
+
+
+def test_estimate_peaks_without_errors_returns_plain_floats(detector_cal):
+    centers, fwhms = detector_cal.estimate_peaks()
+    assert centers.dtype == float and fwhms.dtype == float
+
+
+def test_generate_with_errors_accuracy(detector_cal_with_errors):
+    """generate() works on a spectrum with counts_err and recovers the truth."""
+    axis_calib, res_calib = detector_cal_with_errors.generate()
+    np.testing.assert_allclose(axis_calib.apply(TRUE_CENTERS_CH), TRUE_ENERGIES, atol=1.0)
+    np.testing.assert_allclose(res_calib.apply(TRUE_ENERGIES), TRUE_FWHM_ENERGY_KEV, rtol=0.20)
+
+
+def test_model_fit_uses_sigma_as_weights():
+    """A point with a huge sigma must barely pull the fit."""
+    x = np.arange(5, dtype=float)
+    y = 2.0 * x + 1.0
+    y[-1] += 50.0                                  # outlier
+    sigma = np.array([1.0, 1.0, 1.0, 1.0, 1e6])
+    params, _ = PolynomialEnergyModel(degree=1).fit(x, y, sigma=sigma)
+    np.testing.assert_allclose(params, [2.0, 1.0], atol=1e-6)
+
+
+def test_model_fit_sigma_is_absolute():
+    """sigma is taken as absolute: on noise-free data the covariance is set by
+    sigma alone (cov = (J^T W J)^-1), not rescaled by the (zero) residuals."""
+    x = np.arange(5, dtype=float)
+    y = 2.0 * x + 1.0
+    sigma = np.full(5, 0.5)
+    _, cov = PolynomialEnergyModel(degree=1).fit(x, y, sigma=sigma)
+    J = np.vstack([x, np.ones_like(x)]).T
+    expected = np.linalg.inv(J.T @ J / 0.5**2)
+    np.testing.assert_allclose(cov, expected, rtol=1e-6)

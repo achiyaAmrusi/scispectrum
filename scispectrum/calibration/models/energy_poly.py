@@ -19,7 +19,7 @@ class PolynomialEnergyModel(BaseCalibrationModel):
             )
         return np.polyval(coeffs, ch)
 
-    def fit(self, x: np.ndarray, y: np.ndarray, p0=None):
+    def fit(self, x: np.ndarray, y: np.ndarray, p0=None, sigma=None):
         if p0 is None:
             p0 = np.ones(self.degree + 1)
-        return super().fit(x, y, p0=p0)
+        return super().fit(x, y, p0=p0, sigma=sigma)
