@@ -78,6 +78,12 @@ def domain_peaks_fwhm(domain, prominence=None, **kwargs):
 
     return widths * dx
 
+def _base_width(domain):
+    """Number of channels averaged on each side of the domain for the bases."""
+    local_axis = domain.spectrum.axis[domain.indices]
+    local_resolution = domain.spectrum.resolution_calib(local_axis).mean()/(2 * np.sqrt(2 * np.log(2)))
+    return max(int(local_resolution / (domain.spectrum.axis[1] - domain.spectrum.axis[0]) / 2), 3)
+
 def domain_bases(domain):
     """
     Estimate the left and right bases height by averaging a resolution size of the sides
@@ -95,13 +101,8 @@ def domain_bases(domain):
         The height if each side
     """
 
-    # Local resolution
-    local_axis = domain.spectrum.axis[domain.indices]
-    local_resolution = domain.spectrum.resolution_calib(local_axis).mean()/(2 * np.sqrt(2 * np.log(2)))
-    local_resolution_channel = max(int(local_resolution / (domain.spectrum.axis[1] - domain.spectrum.axis[0]) / 2), 3)
-
-    #
+    local_resolution_channel = _base_width(domain)
     height_left = domain.data[:local_resolution_channel].mean().item()
-    height_right = domain.data[-local_resolution_channel:-1].mean().item()
+    height_right = domain.data[-local_resolution_channel:].mean().item()
 
     return height_left, height_right

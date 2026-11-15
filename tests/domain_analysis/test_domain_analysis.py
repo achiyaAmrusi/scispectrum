@@ -216,3 +216,88 @@ class TestDomainBackground:
     def test_erf_values_near_background_level(self, single_domain):
         bg = domain_erf_background(single_domain, prominence=10)
         assert np.all(np.abs(bg - BG) < 30)
+
+
+# ---------------------------------------------------------------------------
+# Background errors: exact for any sum over the domain (bases inside the domain)
+# ---------------------------------------------------------------------------
+
+from uncertainties.unumpy import nominal_values
+
+def _poisson_domain(scale=1.0, low=False):
+    """Poisson spectrum in counts (scale=1) or normalised (e.g. cps), errors max(sqrt(N),1)."""
+    ch = np.arange(N_CHANNELS, dtype=float)
+    lam = (0.02 if low else 500) + (2 if low else 25000) * np.exp(-((ch - CENTER) ** 2) / (2 * SIGMA ** 2))
+    n = np.random.default_rng(11).poisson(lam).astype(float)
+    sp = Spectrum(counts=n / scale, counts_err=np.maximum(np.sqrt(n), 1) / scale)
+    sp.set_resolution_calibration(_resolution_calib())
+    return Domain(spectrum=sp, start=CENTER - 4 * SIGMA, stop=CENTER + 4 * SIGMA)
+
+def _reference_std(domain, background, window):
+    """Independent error of sum(net[window]): numerical Jacobian of the background on
+    floats, then plain error propagation over independent channels."""
+    x = domain.data.values
+    W = np.array([(background._model(x + np.eye(len(x))[j]) - background._model(x)) for j in range(len(x))]).T
+    sel = np.zeros(len(x)); sel[window] = 1
+    a = sel - sel @ W
+    return np.sqrt((a ** 2 * domain.spectrum.counts_err[domain.indices] ** 2).sum())
+
+@pytest.mark.parametrize("scale", [1.0, 3600.0])
+@pytest.mark.parametrize("low", [False, True])
+@pytest.mark.parametrize("window", [slice(None), slice(20, -20), slice(2, 40)])  # whole / no bases / partial
+def test_linear_background_error_is_exact(scale, low, window):
+    d = _poisson_domain(scale, low)
+    bg = domain_linear_background(d)
+    net = d.subtract_background(bg).data_with_errors.values[window].sum()
+    assert net.s == pytest.approx(_reference_std(d, bg, window), rel=1e-9)
+
+def test_erf_background_error_is_exact_and_peaks_found_once(monkeypatch):
+    import scispectrum.domain_analysis.background as bgmod
+    calls = []
+    monkeypatch.setattr(bgmod, "find_domain_peaks", lambda *a, **k: calls.append(1) or find_domain_peaks(*a, **k))
+    d = _poisson_domain()
+    bg = domain_erf_background(d, prominence=10)
+    sub = d.subtract_background(bg)
+    net = sub.data_with_errors.sum().item()
+    assert net.s == pytest.approx(_reference_std(d, bg, slice(None)), rel=1e-9)
+    assert len(calls) == 1
+
+def test_whole_domain_poisson_formula():
+    """Var(net) = Var(C) + Var(fit) - 2B for Poisson counts summed over the whole domain."""
+    d = _poisson_domain()
+    bg = domain_linear_background(d)
+    net = d.subtract_background(bg).data_with_errors.sum().item()
+    fit = bg._model(d.data_with_errors.values).sum()
+    var_c = (d.spectrum.counts_err[d.indices] ** 2).sum()
+    assert net.s ** 2 == pytest.approx(var_c + fit.s ** 2 - 2 * fit.n, rel=1e-9)
+
+def test_background_is_plain_float_and_data_consistent(single_domain):
+    for d in (single_domain, _poisson_domain()):
+        bg = domain_linear_background(d)
+        assert bg.dtype == float
+        sub = d.subtract_background(bg)
+        assert np.allclose(sub.data.values, d.data.values - bg)
+    assert np.allclose(nominal_values(sub.data_with_errors.values), sub.data.values)
+
+def test_edited_or_foreign_background_falls_back_to_plain_subtraction():
+    d = _poisson_domain()
+    bg = domain_linear_background(d)
+    edited = bg.copy(); edited[5] += 100
+    other = Domain(d.spectrum, start=d.start + 1, stop=d.stop + 1)
+    for dom, b in ((d, edited), (d, bg * 1.1), (other, bg)):
+        sub = dom.subtract_background(b)
+        assert sub._background_model is None
+        assert np.allclose(nominal_values(sub.data_with_errors.values), sub.data.values)
+
+def test_new_counts_err_is_used():
+    d = _poisson_domain()
+    sub = d.subtract_background(domain_linear_background(d))
+    before = sub.data_with_errors.sum().item().s
+    d.spectrum.counts_err = d.spectrum.counts_err * 2
+    assert sub.data_with_errors.sum().item().s == pytest.approx(2 * before)
+
+def test_right_base_uses_last_channels(single_domain):
+    from scispectrum.domain_analysis.morphology import _base_width
+    n = _base_width(single_domain)
+    assert domain_bases(single_domain)[1] == pytest.approx(single_domain.data.values[-n:].mean())
+

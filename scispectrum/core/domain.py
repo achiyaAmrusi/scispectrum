@@ -92,6 +92,13 @@ class Domain:
         else:
             self._background_err = None
 
+        # A background from domain_linear/erf_background carries the recipe it was built
+        # with; if it still reproduces this domain's background, data_with_errors rebuilds
+        # it from the same ufloats, so the errors include the base-bin correlation exactly.
+        model = getattr(background, "_model", None)
+        raw = spectrum.data.values[self.start:self.stop]
+        self._background_model = model if model is not None and np.allclose(model(raw), background) else None
+
     # ------------------------------------------------------------------
     # Core interface
     # ------------------------------------------------------------------
@@ -122,7 +129,9 @@ class Domain:
             **{self.spectrum.axis_name: slice(self.start, self.stop)}
         )
 
-        if self._background is not None:
+        if self._background_model is not None:
+            da = da - self._background_model(da.values)
+        elif self._background is not None:
             bg = uarray(self._background, self._background_err) if self._background_err is not None else self._background
             da = da - bg
 
