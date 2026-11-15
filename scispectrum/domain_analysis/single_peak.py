@@ -51,9 +51,9 @@ def _get_data(single_peak_domain: Domain):
 def center_estimator(single_peak_domain: Domain, center_tolerance=1e-1):
     """
     Estimate the peak center as a weighted centroid within the FWHM region:
-        center = Σ (I_i * x_i) / Σ I_i
-    where the sum runs over coordinates within the FWHM, with the FWHM
-    edges included at half-maximum intensity.
+        center = integral(x * I) / integral(I)
+    integrated over channels (trapezoid rule) from the left to the right FWHM
+    edge, with the counts linearly interpolated at the edges (= half maximum).
 
     Parameters
     ----------
@@ -83,20 +83,29 @@ def center_estimator(single_peak_domain: Domain, center_tolerance=1e-1):
     - The parabolic center is estimated from the three points near
       the maximum and is less sensitive to the overall peak shape.
     """
-    data = _get_data(single_peak_domain)
-    nominal_data = nominal_values(data)
+    data   = _get_data(single_peak_domain)
+    values = data.values
     coords = data.coords[single_peak_domain.spectrum.axis_name].values
-    daxis  = coords[1] - coords[0]
 
-    left_edge, right_edge, half_max = fwhm_edges(single_peak_domain)
-    parabolic_center, _             = _parabolic_maximum(coords, nominal_data)
+    left_edge, right_edge, _ = fwhm_edges(single_peak_domain)
+    parabolic_center, _      = _parabolic_maximum(coords, nominal_values(values))
 
-    fwhm_mask   = (coords >= left_edge) & (coords <= right_edge)
-    fwhm_coords = np.concatenate([[left_edge], coords[fwhm_mask], [right_edge]])
-    fwhm_data   = np.concatenate([[half_max],  data[fwhm_mask], [half_max]])
-    weighted_center = ((fwhm_data * fwhm_coords).sum() / fwhm_data.sum())
+    # interior coords are coords[first:last + 1] (chosen from the nominal edges); each
+    # edge is interpolated between an interior coord and its outer neighbour
+    first = np.searchsorted(coords, nominal_value(left_edge), side="right")
+    last  = np.searchsorted(coords, nominal_value(right_edge), side="left") - 1
 
-    fwhm = right_edge - left_edge
+    left_frac  = (left_edge - coords[first - 1]) / (coords[first] - coords[first - 1])
+    right_frac = (right_edge - coords[last]) / (coords[last + 1] - coords[last])
+    left_value  = values[first - 1] + left_frac * (values[first] - values[first - 1])
+    right_value = values[last] + right_frac * (values[last + 1] - values[last])
+
+    channels = np.array([first - 1 + left_frac, *range(first, last + 1), last + right_frac])
+    axis     = np.array([left_edge, *coords[first:last + 1], right_edge])
+    counts   = np.array([left_value, *values[first:last + 1], right_value])
+    weighted_center = np.trapezoid(axis * counts, channels) / np.trapezoid(counts, channels)
+
+    fwhm = nominal_value(right_edge - left_edge)
     tolerance = center_tolerance * fwhm  # warn if centers disagree by more than 10% of FWHM
     if not np.isclose(
             nominal_value(weighted_center),

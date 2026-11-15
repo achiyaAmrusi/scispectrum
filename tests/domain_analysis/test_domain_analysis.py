@@ -6,6 +6,8 @@ Two synthetic setups:
   two_peak_domain — two well-separated peaks, used to verify multi-peak detection
 """
 
+import warnings
+
 import numpy as np
 import pytest
 
@@ -360,3 +362,30 @@ def test_sum_under_flat_nonlinear_axis():
     b = axis[20] + 0.6 * (axis[21] - axis[20])     # channel 20.6
     assert np.isclose(sum_under(domain, a, b), 10.3)
 
+# ---------------------------------------------------------------------------
+# center_estimator: centroid over the FWHM window
+# ---------------------------------------------------------------------------
+
+_X = np.arange(400, dtype=float)
+_LO, _HI = 164, 236
+
+
+def _gaussian_counts(center=200.0, sigma=12.0, amplitude=3000.0, background=20.0):
+    return background + amplitude * np.exp(-(_X - center) ** 2 / (2 * sigma ** 2))
+
+
+def _peak_domain(counts, with_errors):
+    err = np.sqrt(counts) if with_errors else None
+    return Domain(Spectrum(counts=counts, counts_err=err), _LO, _HI)
+
+
+def test_center_estimator_has_no_sawtooth():
+    """Noiseless peak moved in sub-channel steps: the edges cross coords, and the
+    centroid must not jump (the point-weighted centroid jumped by ~0.27 channels)."""
+    errors = []
+    for center in np.arange(200.0, 201.0, 0.01):
+        domain = _peak_domain(_gaussian_counts(center=center), with_errors=False)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            errors.append(center_estimator(domain) - center)
+    assert np.max(np.abs(errors)) < 0.005
