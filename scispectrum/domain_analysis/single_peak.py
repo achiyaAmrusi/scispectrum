@@ -1,6 +1,6 @@
 import numpy as np
 from uncertainties.unumpy import nominal_values
-from uncertainties import nominal_value
+from uncertainties import nominal_value, unumpy
 from scispectrum.core import Domain
 import warnings
 
@@ -134,6 +134,68 @@ def center_estimator(single_peak_domain: Domain, center_tolerance=1e-1):
         )
 
     return weighted_center
+
+def accurate_center_estimator(single_peak_domain: Domain, top_fraction=0.3):
+    """
+    Estimate the peak center from a parabola fitted to the log of the
+    background-subtracted counts near the top of the peak:
+        ln I(x) = ln A - (x - center)^2 / (2 sigma^2)
+    This is exact for a Gaussian, so (unlike a parabola on I itself) using more
+    channels does not bias the center, it only lowers its error.
+
+    Parameters
+    ----------
+    single_peak_domain : Domain
+        Domain containing a single isolated, Gaussian-like peak, with a background
+        attached (``domain.subtract_background(...)``). The background is not
+        estimated here; an unsubtracted background biases the result.
+    top_fraction : float, optional
+        The fit uses the contiguous channels around the maximum whose counts are
+        at least ``top_fraction * max``. Default is 0.3; a narrower window
+        (e.g. 0.8) gives a larger error, a wider one relies more on the tails,
+        where the background subtraction matters most.
+
+    Returns
+    -------
+    float or ufloat
+        Estimated peak center in the spectrum's axis units; a ufloat if the
+        spectrum has counts_err (including the background's error, if any).
+
+    Raises
+    ------
+    ValueError
+        If the domain has no background, the maximum is not positive, or fewer
+        than 3 channels are above ``top_fraction * max``.
+    """
+    if single_peak_domain.background is None:
+        raise ValueError("accurate_center_estimator requires a domain with a background; "
+                         "attach one with domain.subtract_background(...)")
+
+    data    = _get_data(single_peak_domain)
+    values  = data.values
+    coords  = data.coords[single_peak_domain.spectrum.axis_name].values
+    nominal = nominal_values(values)
+
+    # window: contiguous run around the maximum above top_fraction * max (nominal choice)
+    peak = nominal.argmax()
+    if nominal[peak] <= 0:
+        raise ValueError("The background-subtracted maximum is not positive")
+    above = nominal >= top_fraction * nominal[peak]
+    lo, hi = peak, peak
+    while lo > 0 and above[lo - 1]:
+        lo -= 1
+    while hi < len(nominal) - 1 and above[hi + 1]:
+        hi += 1
+    if hi - lo + 1 < 3:
+        raise ValueError(f"Fewer than 3 channels above top_fraction * max ({top_fraction}); "
+                         f"lower top_fraction or use center_estimator")
+
+    # least squares ln I = a u^2 + b u + c, with u = x - x_peak for conditioning;
+    # the solution is linear in ln I, so ufloats pass through
+    u = coords[lo:hi + 1] - coords[peak]
+    log = unumpy.log if values.dtype == object else np.log
+    a, b, _ = np.linalg.pinv(np.vstack([u**2, u, np.ones_like(u)]).T) @ log(values[lo:hi + 1])
+    return coords[peak] - b / (2 * a)
 
 def fwhm_estimator(single_peak_domain: Domain):
     """Estimate FWHM via interpolated half-maximum crossings.

@@ -439,3 +439,78 @@ def test_estimators_plain_float_without_errors(estimator):
         with_err = estimator(_peak_domain(counts, with_errors=True))
     assert isinstance(plain, float)
     assert np.isclose(plain, nominal_value(with_err))
+
+
+# ---------------------------------------------------------------------------
+# accurate_center_estimator: log-parabola on the background-subtracted top
+# ---------------------------------------------------------------------------
+
+from scispectrum.domain_analysis.single_peak import accurate_center_estimator
+
+_BACKGROUND = 200.0 + 0.5 * _X      # sloped, and large next to the peak's tails
+
+
+def _bg_peak_domain(counts, with_errors, background=_BACKGROUND):
+    return _peak_domain(counts, with_errors).subtract_background(background[_LO:_HI])
+
+
+def test_accurate_center_requires_background():
+    domain = _peak_domain(_gaussian_counts(), with_errors=False)
+    with pytest.raises(ValueError, match="background"):
+        accurate_center_estimator(domain)
+
+
+def test_accurate_center_exact_for_gaussian():
+    """On a noiseless Gaussian with its background subtracted, ln(I) is exactly a
+    parabola, so the center is exact at any sub-channel position."""
+    for center in np.arange(200.0, 201.0, 0.1):
+        counts = _BACKGROUND + _gaussian_counts(center=center, background=0.0)
+        assert abs(accurate_center_estimator(_bg_peak_domain(counts, False)) - center) < 1e-6
+
+
+def test_accurate_center_top_fraction_sets_window():
+    """A wider window still gives the exact center (no shape bias from more points)."""
+    counts = _BACKGROUND + _gaussian_counts(center=200.3, background=0.0)
+    for fraction in (0.95, 0.8, 0.5):
+        center = accurate_center_estimator(_bg_peak_domain(counts, False), top_fraction=fraction)
+        assert abs(center - 200.3) < 1e-6
+
+
+def test_accurate_center_error_equals_finite_difference_jacobian():
+    counts = np.random.default_rng(8).poisson(_BACKGROUND + _gaussian_counts(background=0.0)).astype(float)
+    eps = 1e-3
+    f0 = accurate_center_estimator(_bg_peak_domain(counts, False))
+    jacobian = np.zeros(len(counts))
+    for i in range(_LO, _HI):
+        nudged = counts.copy()
+        nudged[i] += eps
+        jacobian[i] = (accurate_center_estimator(_bg_peak_domain(nudged, False)) - f0) / eps
+    propagated = accurate_center_estimator(_bg_peak_domain(counts, True))
+    assert np.isclose(nominal_value(propagated), f0)
+    assert np.isclose(std_dev(propagated), np.sqrt(np.sum((jacobian * np.sqrt(counts)) ** 2)), rtol=1e-3)
+
+
+def test_accurate_center_plain_float_without_errors():
+    counts = np.random.default_rng(9).poisson(_BACKGROUND + _gaussian_counts(background=0.0)).astype(float)
+    plain = accurate_center_estimator(_bg_peak_domain(counts, False))
+    assert isinstance(plain, float)
+    assert np.isclose(plain, nominal_value(accurate_center_estimator(_bg_peak_domain(counts, True))))
+
+
+def test_accurate_center_with_domain_linear_background():
+    """Works with a background estimated by domain_linear_background (and its
+    correlated errors); the domain is wide enough for flat bases."""
+    counts = np.random.default_rng(10).poisson(_BACKGROUND + _gaussian_counts(background=0.0)).astype(float)
+    spectrum = Spectrum(counts=counts, counts_err=np.sqrt(counts),
+                        resolution_calib=ResolutionCalibration(lambda e: 2 * np.sqrt(2 * np.log(2)) * 12.0))
+    domain = Domain(spectrum, 120, 280)
+    domain = domain.subtract_background(domain_linear_background(domain))
+    center = accurate_center_estimator(domain)
+    assert std_dev(center) > 0
+    assert abs(nominal_value(center) - 200.0) < 5 * std_dev(center)
+
+
+def test_accurate_center_too_few_points_raises():
+    counts = _BACKGROUND + _gaussian_counts(center=200.0, sigma=0.5, background=0.0)
+    with pytest.raises(ValueError, match="top_fraction"):
+        accurate_center_estimator(_bg_peak_domain(counts, False))
