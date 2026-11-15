@@ -16,29 +16,44 @@ def _interpolate_crossing(coords, data, i_low, i_high, threshold):
 
 def _parabolic_maximum(coords, data):
     """Fit parabola through 3 channels around the maximum to sub-channel estimate
-    of the peak position and value. This is a numerical helper, not a physical estimator."""
-    i = data.argmax()
+    of the peak position and value. This is a numerical helper, not a physical estimator.
+    Closed form for any spacing (not polyfit), so ufloat data propagates."""
+    i = nominal_values(data).argmax()
     if i == 0 or i == len(data) - 1:
         return coords[i], data[i]
-    a, b, c = np.polyfit(coords[i-1:i+2], data[i-1:i+2], 2)
+    (x0, x1, x2), (y0, y1, y2) = coords[i-1:i+2], data[i-1:i+2]
+    denom = (x0 - x1) * (x0 - x2) * (x1 - x2)
+    a = (x2 * (y1 - y0) + x1 * (y0 - y2) + x0 * (y2 - y1)) / denom
+    b = (x2**2 * (y0 - y1) + x1**2 * (y2 - y0) + x0**2 * (y1 - y2)) / denom
+    c = (x1 * x2 * (x1 - x2) * y0 + x2 * x0 * (x2 - x0) * y1 + x0 * x1 * (x0 - x1) * y2) / denom
     center     = -b / (2 * a)
-    peak_value = a * center**2 + b * center + c
+    peak_value = c - b**2 / (4 * a)
     return center, peak_value
 
 
 def fwhm_edges(single_peak_domain: Domain):
-    """Find FWHM edges using parabolic maximum and linear interpolation at crossings."""
-    data = _get_data(single_peak_domain)
-    nominal_data = nominal_values(data)
-    coords = data.coords[single_peak_domain.spectrum.axis_name].values
+    """Find FWHM edges using parabolic maximum and linear interpolation at crossings.
+    With counts_err, half_max and the edges are ufloats that depend on the counts;
+    only the choice of channels (maximum, crossings) is made on nominal values.
 
-    _, peak_value = _parabolic_maximum(coords, nominal_data)
+    Note: every access to data_with_errors creates new, independent ufloats, so the
+    edges returned here are uncorrelated with the counts of a later, separate call
+    (e.g. sum_under(domain, left_edge, right_edge)). Use sum_under_fwhm or
+    center_estimator, which use one set of ufloats for edges and counts."""
+    data = _get_data(single_peak_domain)
+    return _fwhm_edges(data.coords[single_peak_domain.spectrum.axis_name].values, data.values)
+
+
+def _fwhm_edges(coords, values):
+    """fwhm_edges on given coords and values (one set of ufloats shared with the caller)."""
+    _, peak_value = _parabolic_maximum(coords, values)
     half_max  = peak_value / 2
 
-    left_idx  = np.where(nominal_data >= half_max)[0][0]
-    right_idx = np.where(nominal_data >= half_max)[0][-1]
-    left_edge  = _interpolate_crossing(coords, nominal_data, left_idx - 1, left_idx,      half_max)
-    right_edge = _interpolate_crossing(coords, nominal_data, right_idx,    right_idx + 1, half_max)
+    above     = np.where(nominal_values(values) >= nominal_value(half_max))[0]
+    left_idx  = above[0]
+    right_idx = above[-1]
+    left_edge  = _interpolate_crossing(coords, values, left_idx - 1, left_idx,      half_max)
+    right_edge = _interpolate_crossing(coords, values, right_idx,    right_idx + 1, half_max)
 
     return left_edge, right_edge, half_max
 
@@ -87,7 +102,7 @@ def center_estimator(single_peak_domain: Domain, center_tolerance=1e-1):
     values = data.values
     coords = data.coords[single_peak_domain.spectrum.axis_name].values
 
-    left_edge, right_edge, _ = fwhm_edges(single_peak_domain)
+    left_edge, right_edge, _ = _fwhm_edges(coords, values)
     parabolic_center, _      = _parabolic_maximum(coords, nominal_values(values))
 
     # interior coords are coords[first:last + 1] (chosen from the nominal edges); each
@@ -136,11 +151,18 @@ def sum_under(single_peak_domain: Domain, left_edge: float, right_edge: float):
     Which coords are interior is chosen from the nominal edges; the edges themselves
     enter the arithmetic, so if they are ufloats their uncertainty (the window's)
     propagates into the sum.
-    """
-    data   = _get_data(single_peak_domain)
-    coords = data.coords[single_peak_domain.spectrum.axis_name].values
-    values = data.values
 
+    Note: the counts here are new ufloats, independent of the ones the edges were
+    computed from (see fwhm_edges), so the correlation between them is lost. For the
+    FWHM window use sum_under_fwhm, which keeps it.
+    """
+    data = _get_data(single_peak_domain)
+    return _sum_under(data.coords[single_peak_domain.spectrum.axis_name].values,
+                      data.values, left_edge, right_edge)
+
+
+def _sum_under(coords, values, left_edge, right_edge):
+    """sum_under on given coords and values (one set of ufloats shared with the caller)."""
     # interior coords are coords[first:last + 1]; each edge lies between an interior
     # coord and its outer neighbour, and is interpolated between those two
     first = np.searchsorted(coords, nominal_value(left_edge), side="right")
@@ -158,5 +180,7 @@ def sum_under(single_peak_domain: Domain, left_edge: float, right_edge: float):
 
 def sum_under_fwhm(single_peak_domain: Domain):
     """Sum counts within the FWHM region. Not suitable for noisy peaks — use a fit instead."""
-    left_edge, right_edge, _ = fwhm_edges(single_peak_domain)
-    return sum_under(single_peak_domain, left_edge, right_edge)
+    data   = _get_data(single_peak_domain)
+    coords = data.coords[single_peak_domain.spectrum.axis_name].values
+    left_edge, right_edge, _ = _fwhm_edges(coords, data.values)
+    return _sum_under(coords, data.values, left_edge, right_edge)

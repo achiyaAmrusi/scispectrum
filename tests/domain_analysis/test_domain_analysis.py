@@ -362,9 +362,12 @@ def test_sum_under_flat_nonlinear_axis():
     b = axis[20] + 0.6 * (axis[21] - axis[20])     # channel 20.6
     assert np.isclose(sum_under(domain, a, b), 10.3)
 
+
 # ---------------------------------------------------------------------------
-# center_estimator: centroid over the FWHM window
+# single_peak: uncertainty propagation through half_max and the FWHM edges
 # ---------------------------------------------------------------------------
+
+from scispectrum.domain_analysis.single_peak import _parabolic_maximum
 
 _X = np.arange(400, dtype=float)
 _LO, _HI = 164, 236
@@ -379,6 +382,15 @@ def _peak_domain(counts, with_errors):
     return Domain(Spectrum(counts=counts, counts_err=err), _LO, _HI)
 
 
+def test_parabolic_maximum_matches_polyfit_on_uneven_coords():
+    coords = np.array([0.0, 1.0, 2.3, 3.1, 4.0])
+    data = -(coords - 2.1) ** 2 + 5.0 + 0.1 * coords
+    a, b, c = np.polyfit(coords[1:4], data[1:4], 2)
+    center, peak = _parabolic_maximum(coords, data)
+    assert np.isclose(center, -b / (2 * a))
+    assert np.isclose(peak, c - b ** 2 / (4 * a))
+
+
 def test_center_estimator_has_no_sawtooth():
     """Noiseless peak moved in sub-channel steps: the edges cross coords, and the
     centroid must not jump (the point-weighted centroid jumped by ~0.27 channels)."""
@@ -389,3 +401,41 @@ def test_center_estimator_has_no_sawtooth():
             warnings.simplefilter("ignore")
             errors.append(center_estimator(domain) - center)
     assert np.max(np.abs(errors)) < 0.005
+
+
+def _sum_under_fwhm(domain):
+    return sum_under_fwhm(domain)
+
+
+@pytest.mark.parametrize("estimator", [center_estimator, fwhm_estimator, _sum_under_fwhm],
+                         ids=["center", "fwhm", "sum_under_fwhm"])
+def test_propagated_error_equals_finite_difference_jacobian(estimator):
+    """sigma_f^2 = sum_i (df/dy_i)^2 sigma_i^2, with df/dy_i from nudging each channel
+    in the plain-float estimator. Fails if any path from the counts to f is dropped."""
+    counts = np.random.default_rng(5).poisson(_gaussian_counts()).astype(float)
+    sigma = np.sqrt(counts)
+    eps = 1e-3
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        f0 = estimator(_peak_domain(counts, with_errors=False))
+        jacobian = np.zeros(len(counts))
+        for i in range(_LO, _HI):
+            nudged = counts.copy()
+            nudged[i] += eps
+            jacobian[i] = (estimator(_peak_domain(nudged, with_errors=False)) - f0) / eps
+        propagated = estimator(_peak_domain(counts, with_errors=True))
+    expected = np.sqrt(np.sum((jacobian * sigma) ** 2))
+    assert np.isclose(nominal_value(propagated), f0)
+    assert np.isclose(std_dev(propagated), expected, rtol=1e-3)
+
+
+@pytest.mark.parametrize("estimator", [center_estimator, fwhm_estimator, _sum_under_fwhm],
+                         ids=["center", "fwhm", "sum_under_fwhm"])
+def test_estimators_plain_float_without_errors(estimator):
+    counts = np.random.default_rng(6).poisson(_gaussian_counts()).astype(float)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        plain = estimator(_peak_domain(counts, with_errors=False))
+        with_err = estimator(_peak_domain(counts, with_errors=True))
+    assert isinstance(plain, float)
+    assert np.isclose(plain, nominal_value(with_err))
